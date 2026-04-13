@@ -1,0 +1,10 @@
+
+- llevar matriz de adyacencia
+podemos usar matriz de control o
+- podemos formar una matriz de adyacencia de todas las intercecciones.
+- checar la generacion de hijos
+- checar como se mueve el pacman , regreando y viendo los pixeles tomando en cuenta el buffer de la tecla
+- hacer variable para ver la profundidad dependiedno del fantasma alfa beta
+- no usar distancais linieales en la de casa en manada , usar distancia no lineal .
+- medir con numero de pasos la eficiencia
+-

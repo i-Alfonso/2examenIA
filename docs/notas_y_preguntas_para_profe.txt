@@ -1,0 +1,300 @@
+NOTAS Y PREGUNTAS PARA EL PROFE
+Proyecto: PacMan - 2o Parcial IA
+Fecha de analisis: 2026-03-27
+
+==================================================
+1. QUE PIDE REALMENTE EL PDF
+==================================================
+
+Del PDF "2o Parcial.pdf" se entiende que el objetivo principal NO es rehacer PacMan completo,
+sino implementar la toma de decisiones de los fantasmas usando poda alfa-beta sobre el proyecto
+base del profesor.
+
+Requisitos explicitos del parcial:
+
+1. Un fantasma rojo (Blinky) con movimiento aleatorio, respetando reglas del laberinto:
+   - solo cambiar de direccion en intersecciones
+   - no regresarse por el camino por donde llego
+
+2. Un fantasma rosa (Pinky) que use poda alfa-beta para perseguir a PacMan:
+   - con una funcion de evaluacion
+   - con al menos dos heuristicas
+   - argumentando el diseno de la funcion
+
+3. Dos fantasmas (Inky y Clyde, cian/naranja) que usen poda alfa-beta con movimiento
+   colaborativo:
+   - con una funcion de evaluacion
+   - con al menos dos heuristicas
+   - argumentando el diseno
+
+4. Implementar poda alfa-beta de forma reutilizable:
+   - para las preguntas previas
+   - con dos estrategias de mejora vistas en clase
+   - incluyendo por default tabú con horizonte limitado
+   - con pseudocodigo e implementacion
+
+5. Entregar:
+   - PDF respondiendo cada pregunta
+   - archivo comprimido con codigo
+   - video de maximo 5 minutos
+
+
+==================================================
+2. ESTADO REAL DEL PROYECTO BASE
+==================================================
+
+Lo que ya existe:
+
+- Renderizado del tablero con pygame + OpenGL.
+- Movimiento manual de PacMan con teclas WASD.
+- Mapa en pixeles mediante mapa.csv.
+- Mapa etiquetado en mapa_codigos.csv.
+- Una matriz de control manual (MC) de 10x10 para intersecciones.
+- Conversion parcial entre coordenadas de pixeles y nodos de control.
+- Movimiento aleatorio de fantasmas respetando estas dos reglas:
+  - cambian de direccion solo en intersecciones
+  - evitan regresarse inmediatamente
+
+Lo que falta de forma clara:
+
+- No existe implementacion real de poda alfa-beta.
+- No existe generacion formal de estados/hijos.
+- No existe funcion de evaluacion.
+- No existe cooperacion entre fantasmas.
+- No existe estructura tabú con horizonte limitado.
+- No existen las dos estrategias de mejora pedidas.
+- No existe medicion de rendimiento.
+- No hay documento ni video.
+
+Observaciones tecnicas importantes del proyecto:
+
+- main.py crea 4 fantasmas, pero los 4 estan inicializados como tipo 0 (aleatorio).
+- Ghost.path_ia() esta vacio en la practica: solo llama al movimiento aleatorio.
+- El codigo actual ya resuelve buena parte de la logica de "no rebotar" en intersecciones.
+- La representacion del mapa para decisiones no es un grafo formal; hoy depende mucho de la
+  matriz MC hecha a mano.
+- PacMan se mueve pixel por pixel, pero las decisiones del fantasma parecen pensadas para
+  tomarse solo en nodos/intersecciones.
+- El mapa base tiene resolucion 359 x 361.
+- mapa_codigos.csv ya marca zonas especiales del laberinto, asi que podria servir para
+  construir automaticamente un grafo o una matriz de adyacencia.
+
+
+==================================================
+3. TUS ANOTACIONES Y COMO SE INTERPRETAN
+==================================================
+
+Tus notas actuales:
+
+- llevar matriz de adyacencia
+- podemos usar matriz de control
+- podemos formar una matriz de adyacencia de todas las intersecciones
+- checar la generacion de hijos
+- checar como se mueve el pacman, regresando y viendo los pixeles tomando en cuenta el buffer de la tecla
+- hacer variable para ver la profundidad dependiendo del fantasma alfa beta
+- no usar distancias lineales en la de caza en manada, usar distancia no lineal
+- medir con numero de pasos la eficiencia
+
+Interpretacion tecnica de tus notas:
+
+- "matriz de adyacencia":
+  apunta a que conviene modelar el laberinto como grafo de intersecciones y no como todos
+  los pixeles del mapa.
+
+- "generacion de hijos":
+  es probablemente el punto clave del parcial. Antes de alfa-beta debes definir que es un
+  estado, quien mueve, cuales son las acciones legales y cuando termina el nivel de busqueda.
+
+- "buffer de la tecla":
+  esto vuelve ambigua la modelacion del jugador. No esta claro si PacMan en alfa-beta debe
+  modelarse como:
+  - jugador racional minimizador
+  - trayectoria actual observada
+  - siguiente direccion buffered por teclado
+
+- "profundidad dependiendo del fantasma":
+  sugiere que el costo del arbol puede variar si es un fantasma solo o dos fantasmas colaborando.
+
+- "distancia no lineal":
+  sugiere que para la persecucion colaborativa no conviene usar distancia euclidiana directa,
+  sino distancia sobre el laberinto, por ejemplo numero de pasos o costo minimo entre nodos.
+
+- "medir con numero de pasos":
+  esto sugiere que en el reporte podria convenir comparar eficiencia con metricas objetivas:
+  pasos para atrapar, promedio en varias corridas, profundidad usada, etc.
+
+
+==================================================
+4. COSAS DIFICILES DE COMPRENDER O AMBIGUAS
+==================================================
+
+Estas son las zonas donde el enunciado y el proyecto base dejan margen de interpretacion:
+
+1. No esta claro si alfa-beta debe operar:
+   - por pixel
+   - por interseccion
+   - por tramo entre intersecciones
+
+2. No esta claro como modelar a PacMan en el arbol:
+   - como adversario racional minimizador
+   - como jugador manual real
+   - como una prediccion local basada en la direccion actual
+
+3. En la parte colaborativa no esta claro si los dos fantasmas hacen:
+   - una accion conjunta en el mismo nivel del arbol
+   - turnos separados dentro del mismo arbol
+   - planeacion compartida con una sola evaluacion global
+
+4. El PDF pide "dos estrategias de mejora" y luego dice "incluyendo por default Tabú con
+   horizonte limitado". No esta 100% claro si:
+   - tabú cuenta como una de las dos
+   - tabú es adicional a las dos
+
+5. No esta claro si la matriz de control dada debe usarse obligatoriamente o si se puede
+   construir una estructura nueva de grafo/adyacencia.
+
+6. No esta claro si se deben conservar exactamente los cuatro fantasmas al mismo tiempo o si
+   basta demostrar cada inciso por separado.
+
+7. No esta claro si la evaluacion del trabajo se enfoca solo en el algoritmo o tambien en:
+   - colisiones
+   - reinicio de partida
+   - puntaje
+   - pellets
+   - reglas completas del juego
+
+8. No esta claro si la heuristica colaborativa debe priorizar:
+   - minimizar la distancia total a PacMan
+   - cerrarle rutas de escape
+   - cubrir nodos de interseccion
+   - repartir zonas del mapa
+
+9. No esta claro si para la eficiencia se espera una metrica formal o solo evidencia visual
+   en el video.
+
+10. No esta claro si se puede ajustar la posicion inicial de los fantasmas para que coincidan
+    mejor con rojo/rosa/cian/naranja, porque el proyecto base hoy tiene dos fantasmas con la
+    misma posicion inicial.
+
+
+==================================================
+5. PREGUNTAS DE CONTROL PARA EL PROFE
+==================================================
+
+Preguntas prioritarias:
+
+1. La poda alfa-beta la espera modelada sobre intersecciones/nodos del laberinto o sobre
+   movimiento pixel por pixel?
+
+2. Para el arbol de decision, PacMan debe modelarse como jugador minimizador con todos sus
+   movimientos legales, o basta con predecir su siguiente movimiento usando direccion actual
+   y buffer de tecla?
+
+3. Podemos construir nuestra propia matriz de adyacencia/grafo del laberinto a partir de las
+   intersecciones, o debemos usar estrictamente la matriz de control que viene en el codigo?
+
+4. En el caso colaborativo de Inky y Clyde, la toma de decision debe hacerse con una accion
+   conjunta de ambos fantasmas o con turnos secuenciales dentro del arbol?
+
+5. En la funcion de evaluacion para la caza en manada, es correcto usar distancia en numero
+   de pasos sobre el grafo del laberinto en lugar de distancia euclidiana?
+
+6. La estrategia tabú con horizonte limitado cuenta como una de las dos mejoras pedidas, o
+   ademas de tabú debemos incluir otras dos estrategias?
+
+7. Las dos estrategias de mejora aceptadas deben ser exactamente las vistas en clase o podemos
+   elegir cualquier par razonable mientras se justifique?
+
+8. La profundidad de busqueda puede variar por fantasma o por escenario
+   (1 fantasma vs 2 fantasmas), o espera una profundidad fija para todos?
+
+9. Para el inciso 1, el fantasma aleatorio ya respetando intersecciones y sin rebote es
+   suficiente, o tambien espera alguna logica extra de persecucion minima?
+
+10. El entregable final debe mostrar los 4 fantasmas funcionando simultaneamente en una sola
+    ejecucion, o se pueden demostrar por separado los incisos del examen?
+
+
+Preguntas utiles para evitar retrabajo:
+
+11. Quiere pseudocodigo general de alfa-beta reutilizable y luego explicar adaptaciones por
+    cada fantasma, o espera pseudocodigo separado por inciso?
+
+12. Para las heuristicas, el minimo son dos componentes; se pueden combinar con pesos
+    lineales o espera una formulacion diferente?
+
+13. En la parte colaborativa, le parece valido usar heuristicas como:
+    - distancia total al PacMan
+    - cobertura de rutas de escape
+    - penalizacion por estar muy juntos
+
+14. Para medir eficiencia, conviene reportar numero de pasos para atrapar a PacMan, promedio
+    de varias corridas y profundidad usada?
+
+15. Espera experimentos repetidos con semilla fija o solo una demostracion funcional en video?
+
+16. Debemos mantener exactamente el layout y posiciones iniciales del codigo base, o se pueden
+    ajustar para que Blinky/Pinky/Inky/Clyde queden mas claros?
+
+17. Si reestructuramos el codigo en nuevas clases o archivos para el arbol, heuristicas y
+    representacion del grafo, sigue siendo valido mientras parta del proyecto base?
+
+18. En el reporte PDF, espera justificacion teorica corta de cada heuristica o comparacion
+    empirica entre variantes?
+
+19. El tabú con horizonte limitado debe impedir repetir:
+    - nodos
+    - direcciones
+    - estados completos
+    - o cualquiera de esas opciones si se argumenta?
+
+20. Si PacMan es controlado manualmente en la demo, el algoritmo puede usar como entrada su
+    posicion actual y sus movimientos legales, aunque no conozca intenciones futuras reales?
+
+
+Preguntas finas, por si en clase da respuestas muy abiertas:
+
+21. Si un fantasma ya va por un corredor, la decision nueva solo se toma al llegar a la
+    siguiente interseccion, correcto?
+
+22. En alfa-beta, el costo del tramo entre nodos puede medirse por longitud del corredor
+    (pasos/pixeles) y no solo por salto uniforme entre intersecciones?
+
+23. Para la funcion colaborativa, quiere que los fantasmas busquen atrapar directamente o que
+    bloqueen rutas aunque tarden mas?
+
+24. Si la funcion de evaluacion ya favorece acorralar a PacMan, eso es suficiente para llamar
+    al comportamiento "cazar en manada" o espera alguna coordinacion explicita extra?
+
+25. Si el jugador invierte direccion dentro del corredor, debemos modelar ese retorno como
+    parte de los hijos del minimizador?
+
+
+==================================================
+6. RECOMENDACION PRACTICA ANTES DE EMPEZAR
+==================================================
+
+Si solo pudieras preguntarle pocas cosas al profe, yo priorizaria estas 6:
+
+1. Alfa-beta por pixeles o por intersecciones?
+2. Como modelar a PacMan dentro del arbol?
+3. Tabú cuenta dentro de las 2 mejoras o es adicional?
+4. La caza colaborativa usa accion conjunta o turnos de dos fantasmas?
+5. Se vale usar distancia por pasos sobre el grafo?
+6. Debemos mostrar todos los fantasmas simultaneamente o cada inciso por separado?
+
+
+==================================================
+7. CONCLUSION DEL ANALISIS
+==================================================
+
+El proyecto base ya te da el movimiento visual, el mapa y la logica basica de intersecciones.
+Lo dificil del parcial no es dibujar ni mover sprites: es definir correctamente la abstraccion
+del problema para que alfa-beta tenga sentido.
+
+La duda central que debes aclarar con el profesor es esta:
+
+"Cual es exactamente el modelo de estado y de turnos que espera para aplicar poda alfa-beta en
+este PacMan?"
+
+Si te responde eso con claridad, lo demas se vuelve mucho mas directo.
