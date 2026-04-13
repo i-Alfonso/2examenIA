@@ -29,20 +29,21 @@ La estrategia recomendada es conservar el proyecto base lo mas intacto posible y
 
 ### Lo Que Todavia No Existe
 
-- No existe una estructura de grafo reutilizable derivada de `MC`, `xMC`, `yMC` y/o `mapa_codigos.csv`.
-- No existe una matriz/lista de adyacencia lista para que alfa-beta genere futuros movimientos.
-- No existe una funcion que diga explicitamente: "desde este nodo, si tomo esta direccion, llego a este otro nodo con este costo".
-- No existe una clase de estado para busqueda.
-- No existe generacion formal de hijos.
 - No existe poda alfa-beta.
-- No existe funcion de evaluacion para Pinky.
-- No existen heuristicas implementadas.
 - No existe memoria tabu con horizonte limitado.
+- No existe controlador que conecte Pinky con alfa-beta dentro del juego.
+- No existe funcion de evaluacion colaborativa para Inky y Clyde.
 - No existe movimiento colaborativo para Inky y Clyde.
 - No existe medicion de rendimiento.
 - No existe deteccion formal de captura.
 - No existe reporte final en PDF.
 - No existe guion o estructura del video.
+
+### Lo Que Ya Se Agrego En El Modulo AI
+
+- `AI/maze_graph.py`: estructura de grafo derivada de las intersecciones existentes.
+- `AI/game_state.py`: estado de busqueda y generacion inicial de hijos.
+- `AI/heuristics.py`: funcion de evaluacion inicial para Pinky.
 
 ## Requisitos Del PDF Del Examen
 
@@ -295,15 +296,24 @@ choose_best_action(state, depth, generate_children, evaluate)
 Responsabilidad:
 
 - Contener funciones de evaluacion.
+- La primera version ya incluye la evaluacion individual de Pinky.
 
-Funciones sugeridas:
+Funciones actuales:
 
 ```python
-evaluate_pinky(state, graph)
-evaluate_pack(state, graph)
 graph_distance(graph, origin, destination)
-escape_routes_score(state, graph)
-separation_score(ghost_a, ghost_b, graph)
+distance_to_pacman(graph, state)
+pacman_escape_routes(graph, state)
+pinky_heuristic_components(graph, state)
+evaluate_pinky_state(graph, state)
+```
+
+Funciones pendientes para la parte colaborativa:
+
+```python
+evaluate_pack_state(graph, state)
+escape_routes_score(graph, state)
+separation_score(graph, ghost_a, ghost_b)
 ```
 
 ### AI/tabu.py
@@ -604,8 +614,8 @@ Crear documentos:
 
 ```text
 docs/diseno_alfa_beta.md
-docs/heuristicas.md
 docs/resultados_pruebas.md
+Documentation/heuristics.md
 ```
 
 Contenido minimo:
@@ -677,40 +687,70 @@ Mitigacion:
 
 ## Prioridad Inmediata
 
-El siguiente paso recomendado es crear:
+Estado actualizado:
 
 ```text
 AI/__init__.py
 AI/maze_graph.py
 ```
 
-Y validar que el grafo derivado desde `MC` tenga:
+Estos archivos ya fueron creados para representar las intersecciones como un grafo reutilizable.
+
+Validacion esperada del grafo derivado desde `MC`:
 
 ```text
 66 nodos
 170 aristas dirigidas
 conectividad completa
+0 aristas asimetricas
 ```
 
-Despues de eso, el segundo paso debe ser implementar distancias con Dijkstra. Sin distancias de grafo, las heuristicas no tendran buena calidad.
+Tambien se agrego Dijkstra en `MazeGraph.shortest_distance()` para calcular distancias reales por el laberinto.
+
+El siguiente paso recomendado ahora es crear:
+
+```text
+AI/game_state.py
+```
+
+Ese archivo debe representar los estados que usara alfa-beta para simular movimientos futuros.
+
+Estado actualizado:
+
+```text
+AI/game_state.py
+```
+
+Ya fue creado con:
+
+- `ActorState`
+- `GameState`
+- generacion de hijos para PacMan
+- generacion de hijos para Pinky
+- generacion de hijos conjunta para Inky/Clyde
+
+Estado actualizado:
+
+```text
+AI/heuristics.py
+```
+
+Ya fue creado con la evaluacion inicial para Pinky:
+
+- distancia real a PacMan usando Dijkstra
+- numero de rutas de escape de PacMan
+- penalizacion tabu preparada para el siguiente paso
 
 ## Resumen De Lo Que Debemos Hacer A Continuacion
 
-1. Crear carpeta `AI`.
-2. Convertir las intersecciones existentes en una estructura de grafo reutilizable.
-3. Agregar pruebas simples del grafo.
-4. Implementar distancia minima en el grafo.
-5. Crear `GameState`.
-6. Crear generacion de hijos.
-7. Implementar alfa-beta generico.
-8. Implementar heuristica de Pinky.
-9. Conectar Pinky al juego.
-10. Agregar tabu.
-11. Implementar heuristica colaborativa.
-12. Conectar Inky y Clyde.
-13. Agregar metricas.
-14. Documentar pseudocodigo y resultados.
-15. Preparar video final.
+1. Implementar alfa-beta generico.
+2. Conectar Pinky al juego.
+3. Agregar tabu con horizonte limitado.
+4. Implementar heuristica colaborativa.
+5. Conectar Inky y Clyde.
+6. Agregar metricas.
+7. Documentar pseudocodigo y resultados.
+8. Preparar video final.
 
 ## Decision De Diseno Recomendada
 
