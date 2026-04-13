@@ -32,11 +32,54 @@ class Pacman:
         #se almacena la direccion inicial del pacman
         self.direction = 1 #asumiendo que inicia en la posicion (0,0)
         #bandera para saber si el pacman se encuentra en estado inicial del juego
-        self.start = 1      
-        
+        self.start = 1
+        #direccion solicitada por el jugador antes de llegar a una interseccion
+        self.buffered_direction = -1
+        self.buffer_start_position = None
+        self.buffer_max_distance = 45
+	        
     def loadTextures(self, texturas, id):
         self.texturas = texturas
         self.Id = id
+
+    def bufferDirection(self, dir):
+        if dir in [0, 1, 2, 3]:
+            self.buffered_direction = dir
+            self.buffer_start_position = (self.position[0], self.position[2])
+
+    def clearDirectionBuffer(self):
+        self.buffered_direction = -1
+        self.buffer_start_position = None
+
+    def getBufferedDirection(self):
+        if self.buffered_direction == -1:
+            return -1
+        if self.buffer_start_position is None:
+            self.clearDirectionBuffer()
+            return -1
+
+        distance = (
+            abs(self.position[0] - self.buffer_start_position[0]) +
+            abs(self.position[2] - self.buffer_start_position[1])
+        )
+
+        if distance > self.buffer_max_distance:
+            self.clearDirectionBuffer()
+            return -1
+
+        return self.buffered_direction
+
+    def updateWithBuffer(self, dir):
+        if dir != -1:
+            self.bufferDirection(dir)
+
+        buffered_dir = self.getBufferedDirection()
+        moved = self.update(buffered_dir)
+
+        if buffered_dir != -1 and moved and self.direction == buffered_dir:
+            self.clearDirectionBuffer()
+        elif buffered_dir != -1 and not moved and self.start != 1:
+            self.update(-1)
 
     def drawFace(self, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4):
         glBegin(GL_QUADS)
@@ -49,8 +92,9 @@ class Pacman:
         glTexCoord2f(1.0, 0.0)
         glVertex3f(x4, y4, z4)
         glEnd()
-        
+	        
     def update(self, dir):
+        start_position = (self.position[0], self.position[2])
         #si pacman se encuentra en una interseccion (valida o "falsa interseccion")
         if ((self.YPxToMC[self.position[2] - 20] != -1) and 
             (self.XPxToMC[self.position[0] - 20] != -1)):
@@ -159,7 +203,9 @@ class Pacman:
                                 self.direction = 1
                             else:
                                 self.position[0] -= 1
-        
+
+        return (self.position[0], self.position[2]) != start_position
+	        
     def draw(self):
         glPushMatrix()
         glColor3f(1.0, 1.0, 1.0)

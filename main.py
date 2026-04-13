@@ -272,21 +272,21 @@ while not done:
     if keys[pygame.K_DOWN]:
         EYE_Y = max(EYE_Y - CAMERA_HEIGHT_STEP, CAMERA_MIN_Y)
         lookat()
-    #Se verifica la direccion para el pacman    
+    #Se verifica la direccion para el pacman
+    pacman_dir = -1
     if keys[pygame.K_w]:
         #direccion 0
-        pc.update(0)
+        pacman_dir = 0
     elif keys[pygame.K_d]:
         #direccion 1
-        pc.update(1)
+        pacman_dir = 1
     elif keys[pygame.K_s]:
         #direccion 2
-        pc.update(2)
+        pacman_dir = 2
     elif keys[pygame.K_a]:
         #direccion 1
-        pc.update(3)
-    else:
-        pc.update(-1)
+        pacman_dir = 3
+    pc.updateWithBuffer(pacman_dir)
 
     display()
     pygame.display.flip()

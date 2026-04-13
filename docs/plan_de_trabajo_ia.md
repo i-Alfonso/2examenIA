@@ -24,11 +24,14 @@ La estrategia recomendada es conservar el proyecto base lo mas intacto posible y
 - Los fantasmas evitan regresar inmediatamente por el camino por donde llegaron.
 - Existe una matriz de control `MC` que representa las intersecciones importantes.
 - Existen arreglos `xMC` y `yMC` que conectan la matriz `MC` con coordenadas reales del mapa.
+- `mapa.csv`, `mapa_codigos.csv` y `MC` ya contienen la informacion base para tomar decisiones solo en intersecciones.
+- La idea del proyecto base es que los personajes avancen por pixeles, pero que las decisiones relevantes se tomen unicamente al llegar a una interseccion.
 
 ### Lo Que Todavia No Existe
 
-- No existe un grafo formal del laberinto.
-- No existe una matriz/lista de adyacencia reutilizable.
+- No existe una estructura de grafo reutilizable derivada de `MC`, `xMC`, `yMC` y/o `mapa_codigos.csv`.
+- No existe una matriz/lista de adyacencia lista para que alfa-beta genere futuros movimientos.
+- No existe una funcion que diga explicitamente: "desde este nodo, si tomo esta direccion, llego a este otro nodo con este costo".
 - No existe una clase de estado para busqueda.
 - No existe generacion formal de hijos.
 - No existe poda alfa-beta.
@@ -85,7 +88,7 @@ Estado actual:
 
 Acciones pendientes:
 
-- Crear el grafo de intersecciones.
+- Formalizar las intersecciones existentes como un grafo/lista de adyacencia.
 - Crear una representacion de estado.
 - Crear generacion de hijos.
 - Implementar poda alfa-beta.
@@ -226,7 +229,8 @@ AI/
 
 Responsabilidad:
 
-- Convertir `MC`, `xMC`, `yMC` en un grafo.
+- Convertir las intersecciones existentes en `MC`, `xMC`, `yMC` y/o `mapa_codigos.csv` en una estructura de grafo.
+- Mantener la misma idea del proyecto base: tomar decisiones solo en intersecciones, no en cada pixel.
 - Guardar nodos.
 - Guardar aristas.
 - Guardar costos entre nodos.
@@ -402,7 +406,9 @@ AI/maze_graph.py
 
 Objetivo:
 
-- Construir el grafo desde `MC`.
+- Construir una representacion formal del grafo a partir de las intersecciones que ya existen.
+- Usar `MC`, `xMC`, `yMC` y, si conviene, validar contra `mapa_codigos.csv`.
+- Evitar que alfa-beta tome decisiones por pixel.
 - Confirmar que hay 66 nodos.
 - Confirmar que el grafo esta conectado.
 - Confirmar que todas las aristas son reciprocas.
@@ -691,7 +697,7 @@ Despues de eso, el segundo paso debe ser implementar distancias con Dijkstra. Si
 ## Resumen De Lo Que Debemos Hacer A Continuacion
 
 1. Crear carpeta `AI`.
-2. Crear el grafo formal del laberinto.
+2. Convertir las intersecciones existentes en una estructura de grafo reutilizable.
 3. Agregar pruebas simples del grafo.
 4. Implementar distancia minima en el grafo.
 5. Crear `GameState`.
@@ -710,12 +716,35 @@ Despues de eso, el segundo paso debe ser implementar distancias con Dijkstra. Si
 
 La decision mas importante es que la IA debe operar por intersecciones, no por pixeles.
 
+Esto no significa crear otro mapa distinto ni ignorar los archivos existentes. Al contrario: la razon de usar `MC`, `xMC`, `yMC`, `mapa.csv` y `mapa_codigos.csv` es precisamente simplificar el problema para que alfa-beta solo decida en puntos donde realmente hay una decision.
+
+El movimiento grafico puede seguir ocurriendo pixel por pixel. Pero mientras un fantasma esta en un pasillo, no necesita volver a calcular una accion en cada pixel, porque no puede cambiar de direccion hasta llegar a la siguiente interseccion.
+
 Motivos:
 
 - Reduce el tamano del arbol de busqueda.
 - Coincide con la regla del examen: solo cambiar direccion en intersecciones.
 - Aprovecha la matriz `MC` ya existente.
+- Aprovecha la informacion codificada en `mapa_codigos.csv`.
 - Facilita calcular distancias reales del laberinto.
 - Hace mas facil explicar alfa-beta en el reporte.
 
-El movimiento visual puede seguir siendo por pixeles. La IA solo decide en que direccion salir cuando el fantasma llega a una interseccion.
+Flujo esperado:
+
+```text
+fantasma avanza por pixeles
+        |
+        v
+llega a una interseccion
+        |
+        v
+se consulta el grafo de intersecciones
+        |
+        v
+alfa-beta decide la siguiente direccion
+        |
+        v
+fantasma sigue por el pasillo hasta la siguiente interseccion
+```
+
+Por eso el trabajo pendiente no es inventar las intersecciones. Las intersecciones ya estan. El trabajo pendiente es convertirlas en una estructura facil de consultar para generar hijos, calcular costos y ejecutar alfa-beta.
