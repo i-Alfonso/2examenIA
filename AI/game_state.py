@@ -123,6 +123,7 @@ def generate_single_ghost_children(
     state,
     ghost_index=0,
     turn_after=TURN_PACMAN,
+    tabu_horizon=0,
 ):
     children = []
     ghost = state.ghosts[ghost_index]
@@ -133,6 +134,10 @@ def generate_single_ghost_children(
             ghost_index,
             next_ghost,
             turn=turn_after,
+        )
+        next_state = next_state.with_tabu_item(
+            ("ghost", ghost_index, next_ghost.node),
+            tabu_horizon,
         )
         children.append((edge.direction, next_state))
 
@@ -145,6 +150,7 @@ def generate_joint_ghost_children(
     state,
     ghost_indices=(0, 1),
     turn_after=TURN_PACMAN,
+    tabu_horizon=0,
 ):
     ghost_options = [
         legal_edges(graph, state.ghosts[index], avoid_reverse=True)
@@ -161,6 +167,11 @@ def generate_joint_ghost_children(
             directions.append(edge.direction)
 
         next_state = state.with_ghosts(tuple(ghosts), turn=turn_after)
+        for index in ghost_indices:
+            next_state = next_state.with_tabu_item(
+                ("ghost", index, ghosts[index].node),
+                tabu_horizon,
+            )
         children.append((tuple(directions), next_state))
 
     return tuple(children)

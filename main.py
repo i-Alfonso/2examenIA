@@ -16,6 +16,7 @@ import sys
 sys.path.append('..')
 from Pacman import Pacman
 from Ghost import Ghost
+from AI import MazeGraph, PackGhostController, PinkyGhostController
 
 
 screen_width = 900
@@ -58,10 +59,10 @@ textures = []
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 file_1 = os.path.join(BASE_PATH, 'mapa.bmp')
 img_pacman = os.path.join(BASE_PATH, 'pacman.bmp')
-img_ghost1 = os.path.join(BASE_PATH, 'fantasma1.bmp')
-img_ghost2 = os.path.join(BASE_PATH, 'fantasma2.bmp')
-img_ghost3 = os.path.join(BASE_PATH, 'fantasma3.bmp')
-img_ghost4 = os.path.join(BASE_PATH, 'fantasma4.bmp')
+img_blinky = os.path.join(BASE_PATH, 'fantasma4.bmp') # rojo
+img_pinky = os.path.join(BASE_PATH, 'fantasma3.bmp') # rosa
+img_inky = os.path.join(BASE_PATH, 'fantasma2.bmp') # azul/cian
+img_clyde = os.path.join(BASE_PATH, 'fantasma1.bmp') # naranja
 
 
 file_csv = os.path.join(BASE_PATH, 'mapa.csv')
@@ -121,14 +122,25 @@ YPxToMC[360] = 9
 path = []
 grid = []
 
+DEBUG_AI_LOGS = True
+AI_LOG_INTERVAL_FRAMES = 60
+frame_count = 0
+
+maze_graph = MazeGraph(MC, xMC, yMC)
+pinky_controller = PinkyGhostController(maze_graph, depth=4)
+pack_controller = PackGhostController(maze_graph, depth=3)
+
 #pacman object
 pc = Pacman(matrix, MC, XPxToMC, YPxToMC)
 #fantasmas
 ghosts = []
 ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 380, 2, 0))
-ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 20, 0, 0))
-ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 380, 3, 0))
-ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 380, 3, 0))
+ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 20, 0, 1))
+ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 380, 3, 1))
+ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 20, 1, 1))
+ghosts[1].setController(pinky_controller)
+ghosts[2].setController(pack_controller, ghost_index=0)
+ghosts[3].setController(pack_controller, ghost_index=1)
 
 
 pygame.init()
@@ -189,14 +201,14 @@ def Init():
     Texturas(file_1)
     #textures[1]: pacman
     Texturas(img_pacman)
-    #textures[2]: fantasma1
-    Texturas(img_ghost1)
-    #textures[3]: fantasma2
-    Texturas(img_ghost2)
-    #textures[4]: fantasma3
-    Texturas(img_ghost3)
-    #textures[5]: fantasma4
-    Texturas(img_ghost4)
+    #textures[2]: Blinky rojo
+    Texturas(img_blinky)
+    #textures[3]: Pinky rosa
+    Texturas(img_pinky)
+    #textures[4]: Inky azul/cian
+    Texturas(img_inky)
+    #textures[5]: Clyde naranja
+    Texturas(img_clyde)
 
     #se pasan las texturas a los objetos
     pc.loadTextures(textures,1)
@@ -236,14 +248,68 @@ def lookat():
     gluLookAt(EYE_X,EYE_Y,EYE_Z,CENTER_X,CENTER_Y,CENTER_Z,UP_X,UP_Y,UP_Z)
 
 def display():
+    global frame_count
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     Axis()
     PlanoTexturizado()
     pc.draw()
+    pack_controller.set_pack_snapshot(
+        ghosts[2].position,
+        ghosts[2].direction,
+        ghosts[3].position,
+        ghosts[3].direction,
+        pc.position,
+        pc.direction,
+    )
     for g in ghosts:
         g.draw()
-        g.update2(pc.position)
-    
+        g.update2(pc.position, pc.direction)
+    log_ai_decisions()
+    frame_count += 1
+
+def format_search_stats(stats):
+    if stats is None:
+        return "stats=None"
+    return (
+        f"nodes={stats.nodes_expanded} "
+        f"leaves={stats.leaves_evaluated} "
+        f"alpha_cuts={stats.alpha_cuts} "
+        f"beta_cuts={stats.beta_cuts} "
+        f"depth={stats.max_depth_reached}"
+    )
+
+def log_ai_decisions():
+    if not DEBUG_AI_LOGS:
+        return
+    if frame_count % AI_LOG_INTERVAL_FRAMES != 0:
+        return
+
+    pinky_components = pinky_controller.last_components
+    pack_components = pack_controller.last_components
+    print(
+        "[AI][State] "
+        f"frame={frame_count} "
+        f"pacman_pos={pc.position} pacman_dir={pc.direction} "
+        f"blinky_pos={ghosts[0].position} blinky_dir={ghosts[0].direction} "
+        f"pinky_pos={ghosts[1].position} pinky_dir={ghosts[1].direction} "
+        f"inky_pos={ghosts[2].position} inky_dir={ghosts[2].direction} "
+        f"clyde_pos={ghosts[3].position} clyde_dir={ghosts[3].direction}"
+    )
+    print(
+        "[AI][Pinky] "
+        f"action={pinky_controller.last_action} "
+        f"value={pinky_controller.last_value} "
+        f"{format_search_stats(pinky_controller.last_stats)} "
+        f"components={pinky_components}"
+    )
+    print(
+        "[AI][Pack] "
+        f"action={pack_controller.last_action} "
+        f"value={pack_controller.last_value} "
+        f"{format_search_stats(pack_controller.last_stats)} "
+        f"components={pack_components}"
+    )
+
 done = False
 Init()
 #finding(matrix, (xarray[0]-20,zarray[0]-20), (xarray[9]-20,zarray[9]-20))

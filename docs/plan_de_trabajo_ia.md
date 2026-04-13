@@ -4,7 +4,9 @@
 
 El objetivo del examen no es rehacer todo PacMan desde cero. El proyecto base ya dibuja el tablero, carga texturas, mueve a PacMan y mueve fantasmas de forma aleatoria.
 
-Lo que falta es implementar la toma de decisiones de los fantasmas usando poda alfa-beta, funciones de evaluacion, heuristicas y movimiento colaborativo.
+Lo que faltaba era implementar la toma de decisiones de los fantasmas usando poda alfa-beta, funciones de evaluacion, heuristicas y movimiento colaborativo.
+
+Estado actual: Blinky ya queda como fantasma aleatorio, Pinky usa alfa-beta individual, e Inky/Clyde usan alfa-beta colaborativo.
 
 La estrategia recomendada es conservar el proyecto base lo mas intacto posible y agregar la nueva logica de IA en archivos nuevos. El codigo existente solo debe llamar esas funciones cuando un fantasma necesite decidir hacia donde moverse.
 
@@ -27,23 +29,22 @@ La estrategia recomendada es conservar el proyecto base lo mas intacto posible y
 - `mapa.csv`, `mapa_codigos.csv` y `MC` ya contienen la informacion base para tomar decisiones solo en intersecciones.
 - La idea del proyecto base es que los personajes avancen por pixeles, pero que las decisiones relevantes se tomen unicamente al llegar a una interseccion.
 
-### Lo Que Todavia No Existe
+### Lo Que Todavia Falta
 
-- No existe poda alfa-beta.
-- No existe memoria tabu con horizonte limitado.
-- No existe controlador que conecte Pinky con alfa-beta dentro del juego.
-- No existe funcion de evaluacion colaborativa para Inky y Clyde.
-- No existe movimiento colaborativo para Inky y Clyde.
-- No existe medicion de rendimiento.
-- No existe deteccion formal de captura.
-- No existe reporte final en PDF.
-- No existe guion o estructura del video.
+- Probar visualmente los cuatro fantasmas dentro del juego.
+- Ajustar pesos de la heuristica colaborativa si Inky/Clyde se amontonan o no bloquean salidas.
+- Revisar logs de rendimiento y ajustar comportamiento.
+- Preparar reporte final en PDF.
+- Preparar guion o estructura del video.
 
 ### Lo Que Ya Se Agrego En El Modulo AI
 
 - `AI/maze_graph.py`: estructura de grafo derivada de las intersecciones existentes.
 - `AI/game_state.py`: estado de busqueda y generacion inicial de hijos.
-- `AI/heuristics.py`: funcion de evaluacion inicial para Pinky.
+- `AI/heuristics.py`: evaluacion para Pinky y evaluacion colaborativa para Inky/Clyde.
+- `AI/alpha_beta.py`: poda alfa-beta reutilizable, Pinky y acciones conjuntas.
+- `AI/ghost_controller.py`: puente entre el juego visual y la IA.
+- `Ghost.py`: validacion de bordes para impedir que los fantasmas salgan del tablero.
 
 ## Requisitos Del PDF Del Examen
 
@@ -59,14 +60,12 @@ Debe cumplir:
 
 Estado actual:
 
-- Este punto esta parcialmente resuelto en `Ghost.py`.
+- Este punto esta resuelto en `Ghost.py` y `main.py`.
 - La funcion `interseccion_random()` ya selecciona movimientos aleatorios validos.
-- Falta documentarlo y asegurarse de que el fantasma rojo sea claramente Blinky.
+- El fantasma rojo usa `fantasma4.bmp` y queda configurado como Blinky.
 
-Acciones pendientes:
+Acciones pendientes de reporte:
 
-- Confirmar que `fantasma1.bmp` corresponde al fantasma rojo.
-- Configurar el primer fantasma como Blinky aleatorio.
 - Agregar explicacion en el reporte.
 - Opcionalmente agregar semilla fija para pruebas reproducibles.
 
@@ -83,18 +82,16 @@ Debe cumplir:
 
 Estado actual:
 
-- No esta implementado.
-- Existe `path_ia()` en `Ghost.py`, pero solo llama al movimiento aleatorio.
-- Ningun fantasma se inicializa actualmente con `tipo=1`.
+- Implementado.
+- Pinky usa `PinkyGhostController`.
+- La funcion `path_ia()` llama al controlador cuando `tipo=1`.
+- `ghosts[1]` se inicializa como Pinky rosa con alfa-beta.
 
-Acciones pendientes:
+Acciones pendientes de ajuste:
 
-- Formalizar las intersecciones existentes como un grafo/lista de adyacencia.
-- Crear una representacion de estado.
-- Crear generacion de hijos.
-- Implementar poda alfa-beta.
-- Crear una funcion de evaluacion para persecucion individual.
-- Conectar Pinky con el controlador de IA.
+- Probar visualmente.
+- Ajustar profundidad si el juego se vuelve lento.
+- Documentar resultados.
 
 Heuristicas recomendadas para Pinky:
 
@@ -119,18 +116,16 @@ Debe cumplir:
 
 Estado actual:
 
-- No esta implementado.
-- Los dos fantasmas finales actualmente son aleatorios.
-- Dos fantasmas empiezan en la misma posicion, lo cual puede afectar la demostracion.
+- Implementado en primera version.
+- Inky y Clyde usan `PackGhostController`.
+- La accion colaborativa se calcula como `(direccion_inky, direccion_clyde)`.
+- Clyde se movio a otra posicion inicial para no empezar encima de Inky.
 
-Acciones pendientes:
+Acciones pendientes de ajuste:
 
-- Definir si la busqueda colaborativa usara acciones conjuntas o turnos secuenciales.
-- Crear un estado con dos fantasmas.
-- Generar hijos para ambos fantasmas.
-- Crear evaluacion colaborativa.
-- Evitar que ambos fantasmas tomen siempre la misma ruta.
-- Conectar Inky y Clyde al controlador colaborativo.
+- Probar visualmente que no se amontonen.
+- Ajustar pesos de cobertura, rutas libres, separacion y solapamiento.
+- Revisar las metricas/logs para explicar el comportamiento.
 
 Heuristicas recomendadas para colaboracion:
 
@@ -308,34 +303,29 @@ pinky_heuristic_components(graph, state)
 evaluate_pinky_state(graph, state)
 ```
 
-Funciones pendientes para la parte colaborativa:
+Funciones agregadas para la parte colaborativa:
 
 ```python
 evaluate_pack_state(graph, state)
-escape_routes_score(graph, state)
-separation_score(graph, ghost_a, ghost_b)
+pack_heuristic_components(graph, state)
+pacman_exit_coverage(graph, state)
+useful_separation_score(graph, state)
+exit_overlap_penalty(graph, state)
 ```
 
-### AI/tabu.py
+### Tabu Con Horizonte Limitado
 
 Responsabilidad:
 
-- Manejar historial tabu.
+- Manejar historial tabu para penalizar ciclos recientes.
+- Mantener una memoria corta dentro de cada `GameState`.
+- Evitar que el fantasma repita nodos recientes sin prohibir movimientos legales.
 
-Datos sugeridos:
+Estado actual:
 
-```python
-max_size
-recent_states
-recent_nodes
-```
-
-Funciones sugeridas:
-
-```python
-add(item)
-contains(item)
-copy_with(item)
+```text
+El tabu ya esta integrado en GameState, alpha_beta y heuristics.
+No se creo AI/tabu.py porque todavia no hace falta separar esa logica.
 ```
 
 ### AI/ghost_controller.py
@@ -739,18 +729,60 @@ Ya fue creado con la evaluacion inicial para Pinky:
 
 - distancia real a PacMan usando Dijkstra
 - numero de rutas de escape de PacMan
-- penalizacion tabu preparada para el siguiente paso
+- penalizacion tabu con horizonte limitado
+
+Tambien se agrego la evaluacion colaborativa para Inky/Clyde:
+
+- distancia de ambos fantasmas a PacMan
+- salidas cubiertas
+- rutas libres de PacMan
+- separacion util entre fantasmas
+- penalizacion por cubrir la misma salida
+- penalizacion tabu
+
+Estado actualizado:
+
+```text
+AI/alpha_beta.py
+```
+
+Ya fue creado con:
+
+- poda alfa-beta generica
+- ordenamiento de movimientos
+- deteccion de captura
+- metricas de busqueda
+- funcion `choose_pinky_action()` conectada con `Ghost.py` mediante `PinkyGhostController`
+- funcion `choose_pack_action()` para Inky/Clyde
+- tabu con horizonte limitado como penalizacion heuristica
+
+Estado actualizado:
+
+```text
+AI/ghost_controller.py
+```
+
+Ya fue creado y conectado con los fantasmas inteligentes:
+
+- `ghosts[0]`: Blinky rojo aleatorio
+- `ghosts[1]`: Pinky rosa con alfa-beta
+- `ghosts[2]`: Inky azul/cian con alfa-beta colaborativo
+- `ghosts[3]`: Clyde naranja con alfa-beta colaborativo
+
+Mapeo de imagenes observado:
+
+- `fantasma4.bmp`: Blinky rojo
+- `fantasma3.bmp`: Pinky rosa
+- `fantasma2.bmp`: Inky azul/cian
+- `fantasma1.bmp`: Clyde naranja
 
 ## Resumen De Lo Que Debemos Hacer A Continuacion
 
-1. Implementar alfa-beta generico.
-2. Conectar Pinky al juego.
-3. Agregar tabu con horizonte limitado.
-4. Implementar heuristica colaborativa.
-5. Conectar Inky y Clyde.
-6. Agregar metricas.
-7. Documentar pseudocodigo y resultados.
-8. Preparar video final.
+1. Probar visualmente los cuatro fantasmas.
+2. Ajustar pesos de la heuristica colaborativa si Inky/Clyde se amontonan.
+3. Revisar metricas visibles o logs de prueba.
+4. Documentar pseudocodigo y resultados.
+5. Preparar video final.
 
 ## Decision De Diseno Recomendada
 

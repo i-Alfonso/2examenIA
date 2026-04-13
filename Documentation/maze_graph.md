@@ -237,15 +237,18 @@ Para Inky y Clyde:
 estado conjunto -> combinaciones de vecinos -> estados hijos colaborativos -> evaluacion compartida
 ```
 
-## Lo Que Sigue
+## Estado Actual
 
-Despues de este modulo, el siguiente paso es crear:
+Despues de crear este modulo, ya se agregaron:
 
 ```text
 AI/game_state.py
+AI/heuristics.py
+AI/alpha_beta.py
+AI/ghost_controller.py
 ```
 
-Ese archivo debe representar:
+`AI/game_state.py` representa:
 
 ```text
 posicion de PacMan
@@ -258,11 +261,12 @@ turno actual
 historial tabu
 ```
 
-Luego se puede implementar:
+El tabu de Pinky se maneja dentro de `GameState.tabu` con horizonte limitado. Por ahora no se necesita un archivo `AI/tabu.py` separado.
+
+Lo que sigue es extender la IA colaborativa:
 
 ```text
-AI/alpha_beta.py
-AI/heuristics.py
-AI/tabu.py
-AI/ghost_controller.py
+heuristica para Inky y Clyde
+controlador de dos fantasmas
+metricas para pruebas
 ```

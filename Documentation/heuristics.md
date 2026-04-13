@@ -4,7 +4,9 @@
 
 Se agrego `AI/heuristics.py` para definir funciones de evaluacion que puedan usar los fantasmas con poda alfa-beta.
 
-La primera funcion implementada es para Pinky, el fantasma rosa que debe perseguir a PacMan usando alfa-beta individual.
+Primero se implemento Pinky, el fantasma rosa que persigue a PacMan usando alfa-beta individual.
+
+Despues se agrego la evaluacion colaborativa para Inky y Clyde, cuyo objetivo no es solo acercarse a PacMan, sino reducir sus rutas de escape.
 
 ## Archivo Agregado
 
@@ -97,7 +99,7 @@ Se calcula con:
 tabu_penalty(state, ghost_index=0)
 ```
 
-Esta parte queda preparada para cuando se implemente tabu con horizonte limitado.
+Esta parte aplica tabu con horizonte limitado cuando los estados hijos agregan nodos recientes al historial.
 
 La idea es penalizar estados donde Pinky vuelva a nodos recientes.
 
@@ -110,7 +112,7 @@ ir derecha
 regresar izquierda
 ```
 
-## Funcion Principal
+## Funcion Principal De Pinky
 
 La funcion principal es:
 
@@ -159,13 +161,99 @@ Esta evaluacion tiene al menos dos componentes principales:
 2. numero de rutas de escape de PacMan
 ```
 
-Ademas deja preparado:
+Ademas incluye:
 
 ```text
 3. penalizacion tabu
 ```
 
-La funcion todavia no mueve a Pinky por si sola. Su objetivo es evaluar estados. La decision final se hara cuando se implemente `AI/alpha_beta.py`.
+La decision final de Pinky se toma desde `AI/alpha_beta.py` con `choose_pinky_action()`.
+
+## Componentes Heuristicos De Inky/Clyde
+
+Para los dos fantasmas colaborativos se agrego:
+
+```python
+evaluate_pack_state(graph, state)
+```
+
+Esta funcion evalua un estado donde `state.ghosts` contiene dos fantasmas:
+
+```text
+ghosts[0] = Inky
+ghosts[1] = Clyde
+```
+
+La idea es premiar estados donde PacMan quede con menos salidas utiles.
+
+Componentes:
+
+```text
+distancia total de Inky/Clyde a PacMan
+distancia del fantasma mas cercano a PacMan
+rutas de escape de PacMan
+salidas cubiertas por algun fantasma
+rutas libres de PacMan
+separacion util entre Inky y Clyde
+penalizacion si ambos cubren la misma salida
+penalizacion tabu
+```
+
+### Salidas Cubiertas
+
+Se calcula con:
+
+```python
+pacman_exit_coverage(graph, state)
+```
+
+Por cada salida de PacMan, se revisa si Inky o Clyde estan cerca de esa salida. Si alguno esta dentro del rango definido por `DEFAULT_PACK_COVERAGE_DISTANCE`, esa salida cuenta como cubierta.
+
+Esto evita que ambos fantasmas persigan por el mismo pasillo sin cerrar otras rutas.
+
+### Separacion Util
+
+Se calcula con:
+
+```python
+useful_separation_score(graph, state)
+```
+
+La separacion se evalua asi:
+
+```text
+demasiado juntos = malo
+separacion media = bueno
+demasiado lejos = neutro
+```
+
+### Solapamiento De Salidas
+
+Se calcula con:
+
+```python
+exit_overlap_penalty(graph, state)
+```
+
+Penaliza cuando Inky y Clyde estan cubriendo la misma salida principal de PacMan. Eso ayuda a que trabajen en rutas distintas.
+
+## Funcion Principal De Inky/Clyde
+
+Formula conceptual:
+
+```text
+score =
+  - distancia_total_a_PacMan
+  - distancia_minima_a_PacMan
+  - rutas_escape_PacMan
+  + salidas_cubiertas
+  - rutas_libres
+  + separacion_util
+  - solapamiento
+  - tabu
+```
+
+Mientras mayor sea el score, mejor es el encierro.
 
 ## Funciones Agregadas
 
@@ -227,21 +315,27 @@ Devuelve el score final para Pinky.
 evaluate_pinky_state(graph, state)
 ```
 
+### pack_heuristic_components
+
+Devuelve las partes de la evaluacion colaborativa.
+
+```python
+pack_heuristic_components(graph, state)
+```
+
+### evaluate_pack_state
+
+Devuelve el score final para Inky/Clyde.
+
+```python
+evaluate_pack_state(graph, state)
+```
+
 ## Lo Que Sigue
 
-Despues de esta heuristica, el siguiente paso es implementar:
+Despues de estas heuristicas, el siguiente paso es probar visualmente:
 
 ```text
-AI/alpha_beta.py
+Pinky persiguiendo con alfa-beta
+Inky/Clyde intentando reducir salidas de PacMan
 ```
-
-Ese archivo debe usar:
-
-```text
-GameState
-generate_single_ghost_children
-generate_pacman_children
-evaluate_pinky_state
-```
-
-para elegir la mejor direccion de Pinky.

@@ -186,6 +186,14 @@ Genera estados hijos para un solo fantasma.
 
 Esto se usara para Pinky.
 
+Tambien puede recibir:
+
+```python
+tabu_horizon=4
+```
+
+Cuando el horizonte es mayor que cero, cada hijo agrega el nuevo nodo del fantasma al historial tabu.
+
 Ejemplo conceptual:
 
 ```text
@@ -210,6 +218,8 @@ Se generan 2 x 3 = 6 estados hijos conjuntos.
 
 Esto permite modelar la caza colaborativa.
 
+Tambien acepta `tabu_horizon` para guardar nodos recientes de ambos fantasmas.
+
 ## Relacion Con Alfa-Beta
 
 Alfa-beta necesitara tres piezas:
@@ -227,35 +237,22 @@ estado actual
 generador inicial de hijos
 ```
 
-Todavia falta:
+Tambien ya se implemento:
 
 ```text
 AI/alpha_beta.py
 AI/heuristics.py
-AI/tabu.py
 AI/ghost_controller.py
 ```
+
+El tabu no esta en un archivo separado. Se guarda en `GameState.tabu` y se actualiza con `with_tabu_item()`.
 
 ## Lo Que Sigue
 
 El siguiente paso recomendado es implementar:
 
 ```text
-AI/heuristics.py
+heuristica colaborativa para Inky y Clyde
 ```
 
-Primero para Pinky:
-
-```text
-distancia real entre Pinky y PacMan
-penalizacion por ciclos
-bonus por acercarse
-```
-
-Despues:
-
-```text
-AI/alpha_beta.py
-```
-
-para elegir la mejor accion usando esos estados hijos.
+Para esa parte se reutilizara este mismo modelo de estado, pero con dos fantasmas dentro de `ghosts`.
