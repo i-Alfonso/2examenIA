@@ -47,6 +47,9 @@ DimBoard = 400
 #Variables para el control del observador
 theta = 0.0
 radius = 300
+CAMERA_HEIGHT_STEP = 2.0
+CAMERA_MIN_Y = 20.0
+CAMERA_MAX_Y = 500.0
 
 
 #Arreglo para el manejo de texturas
@@ -220,9 +223,10 @@ def PlanoTexturizado():
     glEnd()              
     glDisable(GL_TEXTURE_2D)
 
-#Se mueve al observador circularmente al rededor del plano XZ a una altura fija (EYE_Y)
+#Se mueve al observador circularmente al rededor del plano XZ
 def lookat():
     global EYE_X
+    global EYE_Y
     global EYE_Z
     global radius
     center = DimBoard / 2
@@ -261,6 +265,12 @@ while not done:
             theta = 360.0
         else:
             theta += -1.0
+        lookat()
+    if keys[pygame.K_UP]:
+        EYE_Y = min(EYE_Y + CAMERA_HEIGHT_STEP, CAMERA_MAX_Y)
+        lookat()
+    if keys[pygame.K_DOWN]:
+        EYE_Y = max(EYE_Y - CAMERA_HEIGHT_STEP, CAMERA_MIN_Y)
         lookat()
     #Se verifica la direccion para el pacman    
     if keys[pygame.K_w]:
