@@ -2,14 +2,14 @@
 
 ## Objetivo
 
-Se agrego `AI/alpha_beta.py` para implementar poda alfa-beta reutilizable.
+Se agrego `IA/alpha_beta.py` para implementar poda alfa-beta reutilizable.
 
-Este modulo elige la direccion de Pinky usando el modelo de estados del grafo. La conexion con el juego visual se hace desde `AI/ghost_controller.py` y `Ghost.py`.
+Este modulo elige la direccion de Pinky usando el modelo de estados de la matriz de control. La conexion con el juego visual se hace desde `IA/ghost_controller.py` y `Ghost.py`.
 
 ## Archivo Agregado
 
 ```text
-AI/alpha_beta.py
+IA/alpha_beta.py
 ```
 
 ## Idea Principal
@@ -176,7 +176,7 @@ generate_pacman_children
 Funcion lista para elegir la direccion de Pinky.
 
 ```python
-choose_pinky_action(graph, state, depth=4, tabu_horizon=4)
+choose_pinky_action(maze, state, depth=4, tabu_horizon=4)
 ```
 
 Devuelve:
@@ -215,7 +215,7 @@ generate_pacman_children
 Funcion lista para elegir la accion conjunta de Inky y Clyde.
 
 ```python
-choose_pack_action(graph, state, depth=3, tabu_horizon=4)
+choose_pack_action(maze, state, depth=3, tabu_horizon=4)
 ```
 
 Devuelve:
@@ -231,6 +231,68 @@ Donde `best_action` es:
 ```
 
 ## Mejoras Incluidas
+
+### Busqueda Ambiciosa
+
+La busqueda ambiciosa intenta primero alfa-beta con una ventana estrecha alrededor de un valor esperado.
+
+Forma tradicional:
+
+```python
+alpha_beta(state, depth, -inf, inf, ...)
+```
+
+Forma ambiciosa:
+
+```python
+alpha_beta(
+    state,
+    depth,
+    expected_value - aspiration_window,
+    expected_value + aspiration_window,
+    ...
+)
+```
+
+Si el valor calculado cae dentro de la ventana, se acepta.
+
+Si cae fuera de la ventana, se repite la busqueda con ventana completa.
+
+En el proyecto, `expected_value` se toma del ultimo valor calculado por el controlador.
+
+Metricas:
+
+```text
+aspiration_searches
+aspiration_researches
+```
+
+### Continuacion Heuristica
+
+La continuacion heuristica expande un nivel adicional cuando alfa-beta llega al horizonte y el estado parece critico.
+
+Para Pinky, el estado se considera critico si:
+
+```text
+Pinky esta cerca de PacMan
+PacMan tiene varias rutas de escape
+```
+
+Para Inky/Clyde, el estado se considera critico si:
+
+```text
+algun fantasma esta cerca de PacMan
+PacMan mantiene rutas libres
+los fantasmas estan cubriendo la misma salida
+```
+
+Esto reduce el efecto horizonte porque evita evaluar justo antes de una situacion tacticamente importante.
+
+Metrica:
+
+```text
+heuristic_continuations
+```
 
 ### Ordenamiento De Movimientos
 
@@ -256,24 +318,47 @@ Esto significa que la busqueda recuerda solo los ultimos 4 nodos/estados relevan
 
 El tabu se aplica como penalizacion, no como prohibicion absoluta. Esto evita bloquear al fantasma en pasillos o intersecciones con pocas salidas.
 
+## Relacion Con El Inciso 4 Del Parcial
+
+Las dos mejoras principales pedidas por el inciso 4 son:
+
+```text
+1. Busqueda ambiciosa
+2. Continuacion heuristica
+```
+
+Ademas se incluye por default:
+
+```text
+Tabu con horizonte limitado
+```
+
+Tambien se conservan optimizaciones complementarias:
+
+```text
+ordenamiento de movimientos
+corte por captura
+metricas de busqueda
+```
+
 ## Relacion Con La Heuristica
 
 Para Pinky, alfa-beta usa:
 
 ```python
-evaluate_pinky_state(graph, state)
+evaluate_pinky_state(maze, state)
 ```
 
 Esa evaluacion considera:
 
-- distancia real a PacMan,
+- distancia Manhattan a PacMan,
 - rutas de escape de PacMan,
 - penalizacion tabu con horizonte limitado.
 
 Para Inky/Clyde, alfa-beta usa:
 
 ```python
-evaluate_pack_state(graph, state)
+evaluate_pack_state(maze, state)
 ```
 
 Esa evaluacion considera:

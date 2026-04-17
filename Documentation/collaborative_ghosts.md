@@ -9,10 +9,10 @@ La meta no es que ambos fantasmas sigan exactamente el mismo camino hacia PacMan
 ## Archivos Modificados
 
 ```text
-AI/heuristics.py
-AI/alpha_beta.py
-AI/ghost_controller.py
-AI/__init__.py
+IA/heuristics.py
+IA/alpha_beta.py
+IA/ghost_controller.py
+IA/__init__.py
 Ghost.py
 main.py
 ```
@@ -36,7 +36,7 @@ Por eso la evaluacion colaborativa no solo mide distancia.
 La funcion principal es:
 
 ```python
-evaluate_pack_state(graph, state)
+evaluate_pack_state(maze, state)
 ```
 
 Componentes:
@@ -67,7 +67,7 @@ exit_overlap_penalty alto = peor
 Se usa:
 
 ```python
-pacman_exit_coverage(graph, state)
+pacman_exit_coverage(maze, state)
 ```
 
 Por cada salida de PacMan, se revisa si Inky o Clyde estan cerca. Si alguno esta dentro de `DEFAULT_PACK_COVERAGE_DISTANCE`, esa salida se considera cubierta.
@@ -90,7 +90,7 @@ Inky y Clyde cubren la misma salida
 Se agrego:
 
 ```python
-choose_pack_action(graph, state, depth=3, tabu_horizon=4)
+choose_pack_action(maze, state, depth=3, tabu_horizon=4)
 ```
 
 Devuelve:
@@ -121,12 +121,28 @@ PackGhostController
 pack_controller.set_pack_snapshot(...)
 ```
 
+La foto se actualiza cada frame, pero eso no significa que alfa-beta se ejecute cada frame. La decision solo se pide cuando un fantasma llega a una interseccion.
+
 Despues:
 
 ```text
 Inky pide su direccion
 Clyde pide su direccion
 ambos reciben la misma decision conjunta
+```
+
+Matiz importante:
+
+```text
+si un fantasma esta en pasillo, no pide decision y sigue recto.
+```
+
+Por ejemplo, si Inky esta en una interseccion y Clyde esta en un pasillo, Inky puede pedir una decision cooperativa usando la posicion aproximada de Clyde, pero Clyde no cambia de direccion hasta llegar a su propia interseccion.
+
+Los casos completos estan documentados en:
+
+```text
+Documentation/collaborative_decision_timing.md
 ```
 
 ## Estado Actual En El Juego

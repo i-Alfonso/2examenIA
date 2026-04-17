@@ -11,11 +11,11 @@ class ActorState:
     node: tuple[int, int]
     direction: int
 
-    # Sirve para crear una copia del actor despues de tomar una arista del grafo.
-    def moved_to(self, edge):
+    # Sirve para crear una copia del actor despues de tomar una opcion de MC.
+    def moved_to(self, move):
         return ActorState(
-            node=edge.target,
-            direction=edge.direction,
+            node=move.target,
+            direction=move.direction,
         )
 
 
@@ -68,58 +68,58 @@ class GameState:
 
 
 # Sirve para convertir una posicion del juego a un ActorState basado en nodos.
-def actor_from_position(graph, position, direction, require_exact=True):
+def actor_from_position(maze, position, direction, require_exact=True):
     x = position[0]
     z = position[2] if len(position) > 2 else position[1]
-    node = graph.pixel_to_node(x, z, require_exact=require_exact)
+    node = maze.pixel_to_node(x, z, require_exact=require_exact)
     if node is None:
         raise ValueError(f"Position {position} does not match a maze node")
     return ActorState(node=node, direction=direction)
 
 
-# Sirve para obtener las aristas legales de un actor usando la regla de no regresar.
-def legal_edges(graph, actor, avoid_reverse=True):
-    edges = tuple(graph.get_neighbors(actor.node))
+# Sirve para obtener los movimientos legales de un actor usando la regla de no regresar.
+def legal_moves(maze, actor, avoid_reverse=True):
+    moves = tuple(maze.get_neighbors(actor.node))
 
     if not avoid_reverse:
-        return edges
+        return moves
 
-    if actor.direction not in graph.INVERSE_DIRECTIONS:
-        return edges
+    if actor.direction not in maze.INVERSE_DIRECTIONS:
+        return moves
 
-    inverse_direction = graph.inverse_direction(actor.direction)
-    filtered_edges = tuple(
-        edge for edge in edges
-        if edge.direction != inverse_direction
+    inverse_direction = maze.inverse_direction(actor.direction)
+    filtered_moves = tuple(
+        move for move in moves
+        if move.direction != inverse_direction
     )
 
     # Si solo existe el camino inverso, se permite para no dejar al actor bloqueado.
-    return filtered_edges if filtered_edges else edges
+    return filtered_moves if filtered_moves else moves
 
 
 # Sirve para obtener solo los codigos de direccion legal de un actor.
-def legal_directions(graph, actor, avoid_reverse=True):
+def legal_directions(maze, actor, avoid_reverse=True):
     return tuple(
-        edge.direction
-        for edge in legal_edges(graph, actor, avoid_reverse=avoid_reverse)
+        move.direction
+        for move in legal_moves(maze, actor, avoid_reverse=avoid_reverse)
     )
 
 
 # Sirve para generar los estados hijos cuando el turno lo toma PacMan.
-def generate_pacman_children(graph, state, turn_after=TURN_GHOSTS):
+def generate_pacman_children(maze, state, turn_after=TURN_GHOSTS):
     children = []
 
-    for edge in legal_edges(graph, state.pacman, avoid_reverse=False):
-        next_pacman = state.pacman.moved_to(edge)
+    for move in legal_moves(maze, state.pacman, avoid_reverse=False):
+        next_pacman = state.pacman.moved_to(move)
         next_state = state.with_pacman(next_pacman, turn=turn_after)
-        children.append((edge.direction, next_state))
+        children.append((move.direction, next_state))
 
     return tuple(children)
 
 
 # Sirve para generar los estados hijos de un solo fantasma, como Pinky.
 def generate_single_ghost_children(
-    graph,
+    maze,
     state,
     ghost_index=0,
     turn_after=TURN_PACMAN,
@@ -128,8 +128,8 @@ def generate_single_ghost_children(
     children = []
     ghost = state.ghosts[ghost_index]
 
-    for edge in legal_edges(graph, ghost, avoid_reverse=True):
-        next_ghost = ghost.moved_to(edge)
+    for move in legal_moves(maze, ghost, avoid_reverse=True):
+        next_ghost = ghost.moved_to(move)
         next_state = state.with_ghost(
             ghost_index,
             next_ghost,
@@ -139,32 +139,32 @@ def generate_single_ghost_children(
             ("ghost", ghost_index, next_ghost.node),
             tabu_horizon,
         )
-        children.append((edge.direction, next_state))
+        children.append((move.direction, next_state))
 
     return tuple(children)
 
 
 # Sirve para generar estados hijos de dos fantasmas que deciden en conjunto.
 def generate_joint_ghost_children(
-    graph,
+    maze,
     state,
     ghost_indices=(0, 1),
     turn_after=TURN_PACMAN,
     tabu_horizon=0,
 ):
     ghost_options = [
-        legal_edges(graph, state.ghosts[index], avoid_reverse=True)
+        legal_moves(maze, state.ghosts[index], avoid_reverse=True)
         for index in ghost_indices
     ]
     children = []
 
-    for edge_group in product(*ghost_options):
+    for move_group in product(*ghost_options):
         ghosts = list(state.ghosts)
         directions = []
 
-        for index, edge in zip(ghost_indices, edge_group):
-            ghosts[index] = ghosts[index].moved_to(edge)
-            directions.append(edge.direction)
+        for index, move in zip(ghost_indices, move_group):
+            ghosts[index] = ghosts[index].moved_to(move)
+            directions.append(move.direction)
 
         next_state = state.with_ghosts(tuple(ghosts), turn=turn_after)
         for index in ghost_indices:

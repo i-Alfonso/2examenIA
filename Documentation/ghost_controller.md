@@ -2,14 +2,14 @@
 
 ## Objetivo
 
-Se agrego `AI/ghost_controller.py` para conectar la IA con los fantasmas del juego.
+Se agrego `IA/ghost_controller.py` para conectar la IA con los fantasmas del juego.
 
 La idea es que `Ghost.py` no contenga la implementacion de alfa-beta. El fantasma solo pregunta al controlador que direccion debe tomar cuando llega a una interseccion.
 
 ## Archivo Agregado
 
 ```text
-AI/ghost_controller.py
+IA/ghost_controller.py
 ```
 
 ## Cambios En El Proyecto
@@ -19,7 +19,7 @@ Se actualizo:
 ```text
 Ghost.py
 main.py
-AI/__init__.py
+IA/__init__.py
 ```
 
 ## PinkyGhostController
@@ -33,14 +33,20 @@ PinkyGhostController
 Se crea con:
 
 ```python
-pinky_controller = PinkyGhostController(maze_graph, depth=4, tabu_horizon=4)
+pinky_controller = PinkyGhostController(
+    maze_control,
+    depth=4,
+    tabu_horizon=4,
+    aspiration_window=80,
+    heuristic_continuation_depth=1,
+)
 ```
 
 Donde:
 
 ```text
-maze_graph
-  grafo de intersecciones del laberinto.
+maze_control
+  matriz de control del laberinto.
 
 depth
   profundidad de busqueda para alfa-beta.
@@ -55,7 +61,7 @@ Cuando Pinky llega a una interseccion:
 
 ```text
 1. Ghost.py llama al controlador.
-2. El controlador convierte posiciones reales a nodos del grafo.
+2. El controlador convierte posiciones reales a nodos de la matriz de control.
 3. Crea un GameState.
 4. Ejecuta choose_pinky_action().
 5. Devuelve una direccion.
@@ -115,7 +121,13 @@ PackGhostController
 Se crea con:
 
 ```python
-pack_controller = PackGhostController(maze_graph, depth=3, tabu_horizon=4)
+pack_controller = PackGhostController(
+    maze_control,
+    depth=3,
+    tabu_horizon=4,
+    aspiration_window=120,
+    heuristic_continuation_depth=1,
+)
 ```
 
 Este controlador decide para dos fantasmas al mismo tiempo:
@@ -131,6 +143,8 @@ Antes de actualizar los fantasmas, `main.py` toma una foto de sus posiciones:
 pack_controller.set_pack_snapshot(...)
 ```
 
+Esta foto se actualiza cada frame para mantener posiciones recientes, pero la llamada costosa a alfa-beta solo ocurre cuando un fantasma inteligente llega a una interseccion y pide `next_direction()`.
+
 Luego cada fantasma pregunta su direccion. El controlador calcula una sola accion conjunta:
 
 ```text
@@ -140,6 +154,14 @@ Luego cada fantasma pregunta su direccion. El controlador calcula una sola accio
 y devuelve a cada fantasma la direccion que le corresponde.
 
 Esto evita que Inky decida con una posicion y Clyde decida con otra posicion ya modificada.
+
+Si uno de los dos fantasmas colaborativos esta en pasillo, no pregunta al controlador y solo sigue adelante. El controlador puede aproximar su posicion al nodo mas cercano para que el otro fantasma tome una decision cooperativa, pero el fantasma en pasillo no cambia de direccion hasta su siguiente interseccion.
+
+Los casos borde estan explicados en:
+
+```text
+Documentation/collaborative_decision_timing.md
+```
 
 ## Cambios En Ghost.py
 
@@ -184,20 +206,28 @@ Ese metodo llama al controlador.
 Se agrego:
 
 ```python
-from AI import MazeGraph, PackGhostController, PinkyGhostController
+from IA import MazeControl, PackGhostController, PinkyGhostController
 ```
 
-Se crea el grafo:
+Se crea la matriz de control:
 
 ```python
-maze_graph = MazeGraph(MC, xMC, yMC)
+maze_control = MazeControl(MC, xMC, yMC)
 ```
 
 Se crea el controlador:
 
 ```python
-pinky_controller = PinkyGhostController(maze_graph, depth=4, tabu_horizon=4)
-pack_controller = PackGhostController(maze_graph, depth=3, tabu_horizon=4)
+pinky_controller = PinkyGhostController(maze_control, depth=4, tabu_horizon=4)
+pack_controller = PackGhostController(maze_control, depth=3, tabu_horizon=4)
+```
+
+Los valores omitidos usan estos defaults:
+
+```text
+Pinky aspiration_window = 80
+Pack aspiration_window = 120
+heuristic_continuation_depth = 1
 ```
 
 El segundo fantasma se configura como Pinky inteligente:
@@ -243,6 +273,9 @@ valor de alfa-beta
 nodos expandidos
 hojas evaluadas
 cortes alfa/beta
+busquedas ambiciosas
+re-busquedas por ventana fallida
+continuaciones heuristicas
 componentes heuristicos
 ```
 

@@ -39,11 +39,11 @@ La estrategia recomendada es conservar el proyecto base lo mas intacto posible y
 
 ### Lo Que Ya Se Agrego En El Modulo AI
 
-- `AI/maze_graph.py`: estructura de grafo derivada de las intersecciones existentes.
-- `AI/game_state.py`: estado de busqueda y generacion inicial de hijos.
-- `AI/heuristics.py`: evaluacion para Pinky y evaluacion colaborativa para Inky/Clyde.
-- `AI/alpha_beta.py`: poda alfa-beta reutilizable, Pinky y acciones conjuntas.
-- `AI/ghost_controller.py`: puente entre el juego visual y la IA.
+- `IA/maze_control.py`: estructura de matriz de control derivada de las intersecciones existentes.
+- `IA/game_state.py`: estado de busqueda y generacion inicial de hijos.
+- `IA/heuristics.py`: evaluacion para Pinky y evaluacion colaborativa para Inky/Clyde.
+- `IA/alpha_beta.py`: poda alfa-beta reutilizable, Pinky y acciones conjuntas.
+- `IA/ghost_controller.py`: puente entre el juego visual y la IA.
 - `Ghost.py`: validacion de bordes para impedir que los fantasmas salgan del tablero.
 
 ## Requisitos Del PDF Del Examen
@@ -95,12 +95,12 @@ Acciones pendientes de ajuste:
 
 Heuristicas recomendadas para Pinky:
 
-- Distancia por pasos sobre el grafo entre Pinky y PacMan.
+- Distancia Manhattan entre Pinky y PacMan.
 - Penalizacion si Pinky se aleja del PacMan respecto al estado anterior.
 - Penalizacion tabu para evitar ciclos.
 - Bonus si Pinky queda en una interseccion con varias salidas hacia PacMan.
 
-La distancia debe ser sobre el grafo del laberinto, no distancia euclidiana directa. Esto es importante porque en un laberinto una distancia visual corta puede estar bloqueada por paredes.
+La distancia no debe resolver camino minimo. La matriz de control se usa para generar movimientos legales; la cercania se estima con Manhattan para no convertir la IA en pathfinding.
 
 ### Inciso 3: Inky Y Clyde Colaborativos
 
@@ -151,29 +151,31 @@ Debe incluir:
 
 Estado actual:
 
-- No existe.
+- Implementado en `IA/alpha_beta.py`.
 
-Acciones pendientes:
+Elementos implementados:
 
-- Crear archivo nuevo para alfa-beta.
-- Hacer que el algoritmo reciba funciones externas:
+- Archivo nuevo para alfa-beta.
+- El algoritmo recibe funciones externas:
   - generador de hijos,
   - evaluador,
   - prueba de terminal,
   - profundidad maxima.
-- Agregar ordenamiento de movimientos como mejora.
-- Agregar continuacion heuristica o busqueda ambiciosa como mejora.
-- Agregar tabu con horizonte limitado.
+- Busqueda ambiciosa.
+- Continuacion heuristica.
+- Tabu con horizonte limitado.
+- Ordenamiento de movimientos como optimizacion complementaria.
+- Corte por captura como optimizacion complementaria.
 
-Estrategias recomendadas:
+Estrategias principales:
 
-- Ordenamiento de movimientos: evaluar primero los movimientos que parecen acercarse mas a PacMan.
-- Busqueda ambiciosa: priorizar caminos con mejor evaluacion heuristica inmediata.
+- Busqueda ambiciosa: iniciar alfa-beta con una ventana estrecha alrededor del valor esperado.
+- Continuacion heuristica: extender un nivel extra cuando el horizonte termina en un estado critico.
 - Tabu con horizonte limitado: recordar ultimos nodos o estados para evitar ciclos.
 
 Punto importante:
 
-El PDF dice "incluyendo dos estrategias de mejora" e "incluyendo por default Tabu con horizonte limitado". Conviene implementar tabu y ademas otra mejora clara, para evitar una interpretacion estricta del profesor.
+El PDF dice "incluyendo dos estrategias de mejora" e "incluyendo por default Tabu con horizonte limitado". Por eso las mejoras defendibles en el reporte deben ser busqueda ambiciosa y continuacion heuristica. El tabu se presenta como requisito adicional por default.
 
 ### Inciso 5: Video Y Entregables
 
@@ -205,15 +207,15 @@ Acciones pendientes:
 Para evitar modificar demasiado el proyecto base, se recomienda crear una carpeta nueva:
 
 ```text
-AI/
+IA/
 ```
 
 Contenido recomendado:
 
 ```text
-AI/
+IA/
   __init__.py
-  maze_graph.py
+  maze_control.py
   game_state.py
   alpha_beta.py
   heuristics.py
@@ -221,14 +223,14 @@ AI/
   ghost_controller.py
 ```
 
-### AI/maze_graph.py
+### IA/maze_control.py
 
 Responsabilidad:
 
-- Convertir las intersecciones existentes en `MC`, `xMC`, `yMC` y/o `mapa_codigos.csv` en una estructura de grafo.
+- Convertir las intersecciones existentes en `MC`, `xMC`, `yMC` y/o `mapa_codigos.csv` en una estructura de matriz de control.
 - Mantener la misma idea del proyecto base: tomar decisiones solo en intersecciones, no en cada pixel.
 - Guardar nodos.
-- Guardar aristas.
+- Guardar conexiones.
 - Guardar costos entre nodos.
 - Traducir direccion a siguiente nodo.
 - Traducir posicion de pixel a nodo cercano.
@@ -236,7 +238,7 @@ Responsabilidad:
 Funciones sugeridas:
 
 ```python
-build_graph(mc, x_coords, y_coords)
+MazeControl(mc, x_coords, y_coords)
 get_neighbors(node)
 get_cost(origin, destination)
 direction_between(origin, destination)
@@ -244,7 +246,7 @@ pixel_to_node(x, z)
 node_to_pixel(node)
 ```
 
-### AI/game_state.py
+### IA/game_state.py
 
 Responsabilidad:
 
@@ -266,7 +268,7 @@ Para Pinky, `ghost_nodes` puede tener un solo fantasma.
 
 Para Inky/Clyde, `ghost_nodes` debe tener dos fantasmas.
 
-### AI/alpha_beta.py
+### IA/alpha_beta.py
 
 Responsabilidad:
 
@@ -286,7 +288,7 @@ Tambien se puede crear una funcion auxiliar:
 choose_best_action(state, depth, generate_children, evaluate)
 ```
 
-### AI/heuristics.py
+### IA/heuristics.py
 
 Responsabilidad:
 
@@ -296,21 +298,22 @@ Responsabilidad:
 Funciones actuales:
 
 ```python
-graph_distance(graph, origin, destination)
-distance_to_pacman(graph, state)
-pacman_escape_routes(graph, state)
-pinky_heuristic_components(graph, state)
-evaluate_pinky_state(graph, state)
+manhattan_distance(maze, origin, destination)
+manhattan_distance(maze, origin, destination)
+distance_to_pacman(maze, state)
+pacman_escape_routes(maze, state)
+pinky_heuristic_components(maze, state)
+evaluate_pinky_state(maze, state)
 ```
 
 Funciones agregadas para la parte colaborativa:
 
 ```python
-evaluate_pack_state(graph, state)
-pack_heuristic_components(graph, state)
-pacman_exit_coverage(graph, state)
-useful_separation_score(graph, state)
-exit_overlap_penalty(graph, state)
+evaluate_pack_state(maze, state)
+pack_heuristic_components(maze, state)
+pacman_exit_coverage(maze, state)
+useful_separation_score(maze, state)
+exit_overlap_penalty(maze, state)
 ```
 
 ### Tabu Con Horizonte Limitado
@@ -325,10 +328,10 @@ Estado actual:
 
 ```text
 El tabu ya esta integrado en GameState, alpha_beta y heuristics.
-No se creo AI/tabu.py porque todavia no hace falta separar esa logica.
+No se creo IA/tabu.py porque todavia no hace falta separar esa logica.
 ```
 
-### AI/ghost_controller.py
+### IA/ghost_controller.py
 
 Responsabilidad:
 
@@ -354,19 +357,18 @@ Direcciones usadas por el proyecto:
 Cambios esperados:
 
 - Importar los controladores de IA.
-- Crear el grafo una sola vez.
+- Crear la matriz de control una sola vez.
 - Crear controladores para Pinky, Inky y Clyde.
 - Pasar referencias a los fantasmas.
 
 Ejemplo conceptual:
 
 ```python
-from AI.maze_graph import MazeGraph
-from AI.ghost_controller import GhostController
+from IA import MazeControl, PackGhostController, PinkyGhostController
 
-maze_graph = MazeGraph(MC, xMC, yMC)
-pinky_controller = GhostController(maze_graph, mode="pinky")
-pack_controller = GhostController(maze_graph, mode="pack")
+maze_control = MazeControl(MC, xMC, yMC)
+pinky_controller = GhostController(maze_control, mode="pinky")
+pack_controller = GhostController(maze_control, mode="pack")
 ```
 
 ### Ghost.py
@@ -400,29 +402,29 @@ Cambios esperados:
 Crear:
 
 ```text
-AI/__init__.py
-AI/maze_graph.py
+IA/__init__.py
+IA/maze_control.py
 ```
 
 Objetivo:
 
-- Construir una representacion formal del grafo a partir de las intersecciones que ya existen.
+- Construir una representacion formal de la matriz de control a partir de las intersecciones que ya existen.
 - Usar `MC`, `xMC`, `yMC` y, si conviene, validar contra `mapa_codigos.csv`.
 - Evitar que alfa-beta tome decisiones por pixel.
 - Confirmar que hay 66 nodos.
-- Confirmar que el grafo esta conectado.
-- Confirmar que todas las aristas son reciprocas.
+- Confirmar que la matriz de control esta conectado.
+- Confirmar que todas las conexiones son reciprocas.
 
 Criterio de exito:
 
 - Un script de prueba imprime los nodos y vecinos sin abrir la ventana OpenGL.
 
-### Paso 2: Crear Pruebas Basicas Del Grafo
+### Paso 2: Crear Pruebas Basicas Del Matriz de control
 
 Crear una prueba o script simple que valide:
 
 - Cantidad de nodos.
-- Cantidad de aristas.
+- Cantidad de conexiones.
 - Conectividad.
 - Conversion pixel a nodo.
 - Conversion nodo a pixel.
@@ -432,16 +434,16 @@ Criterio de exito:
 - PacMan inicial `(20, 20)` corresponde al nodo `(0, 0)`.
 - Fantasma inferior derecho `(378, 380)` corresponde al nodo `(9, 9)`.
 
-### Paso 3: Implementar Distancias En El Grafo
+### Paso 3: Implementar Distancias Heuristicas
 
-Agregar distancia minima usando BFS o Dijkstra.
+Agregar distancia Manhattan para las heuristicas.
 
-Como las aristas tienen costos distintos en pixeles, Dijkstra es mejor que BFS.
+No se debe usar camino minimo para decidir la persecucion, porque la decision debe salir de alfa-beta.
 
 Criterio de exito:
 
-- Se puede calcular distancia de cualquier nodo a cualquier otro.
-- La distancia respeta paredes porque viaja por el grafo, no por linea recta.
+- Se puede estimar cercania entre cualquier nodo y PacMan sin pathfinding.
+- La distancia respeta paredes porque viaja por la matriz de control, no por linea recta.
 
 ### Paso 4: Crear GameState
 
@@ -505,7 +507,7 @@ Funcion sugerida:
 
 ```text
 score =
-  - distancia_grafo(Pinky, PacMan)
+  - distancia_manhattan(Pinky, PacMan)
   - penalizacion_tabu
   + bonus_por_reducir_distancia
 ```
@@ -513,7 +515,7 @@ score =
 Criterio de exito:
 
 - Pinky deja de moverse aleatoriamente.
-- Pinky tiende a acercarse a PacMan por caminos reales del laberinto.
+- Pinky tiende a acercarse a PacMan usando decisiones legales de alfa-beta.
 
 ### Paso 8: Implementar Tabu
 
@@ -680,27 +682,27 @@ Mitigacion:
 Estado actualizado:
 
 ```text
-AI/__init__.py
-AI/maze_graph.py
+IA/__init__.py
+IA/maze_control.py
 ```
 
-Estos archivos ya fueron creados para representar las intersecciones como un grafo reutilizable.
+Estos archivos ya fueron creados para representar las intersecciones como una matriz de control reutilizable.
 
-Validacion esperada del grafo derivado desde `MC`:
+Validacion esperada de la matriz de control derivada desde `MC`:
 
 ```text
 66 nodos
-170 aristas dirigidas
+170 conexiones dirigidas
 conectividad completa
-0 aristas asimetricas
+0 conexiones asimetricas
 ```
 
-Tambien se agrego Dijkstra en `MazeGraph.shortest_distance()` para calcular distancias reales por el laberinto.
+Se cambio la medicion de cercania para no usar camino minimo. Ahora las heuristicas usan distancia Manhattan entre coordenadas de nodos.
 
 El siguiente paso recomendado ahora es crear:
 
 ```text
-AI/game_state.py
+IA/game_state.py
 ```
 
 Ese archivo debe representar los estados que usara alfa-beta para simular movimientos futuros.
@@ -708,7 +710,7 @@ Ese archivo debe representar los estados que usara alfa-beta para simular movimi
 Estado actualizado:
 
 ```text
-AI/game_state.py
+IA/game_state.py
 ```
 
 Ya fue creado con:
@@ -722,12 +724,12 @@ Ya fue creado con:
 Estado actualizado:
 
 ```text
-AI/heuristics.py
+IA/heuristics.py
 ```
 
 Ya fue creado con la evaluacion inicial para Pinky:
 
-- distancia real a PacMan usando Dijkstra
+- distancia Manhattan a PacMan
 - numero de rutas de escape de PacMan
 - penalizacion tabu con horizonte limitado
 
@@ -743,12 +745,14 @@ Tambien se agrego la evaluacion colaborativa para Inky/Clyde:
 Estado actualizado:
 
 ```text
-AI/alpha_beta.py
+IA/alpha_beta.py
 ```
 
 Ya fue creado con:
 
 - poda alfa-beta generica
+- busqueda ambiciosa
+- continuacion heuristica
 - ordenamiento de movimientos
 - deteccion de captura
 - metricas de busqueda
@@ -759,7 +763,7 @@ Ya fue creado con:
 Estado actualizado:
 
 ```text
-AI/ghost_controller.py
+IA/ghost_controller.py
 ```
 
 Ya fue creado y conectado con los fantasmas inteligentes:
@@ -781,7 +785,7 @@ Mapeo de imagenes observado:
 1. Probar visualmente los cuatro fantasmas.
 2. Ajustar pesos de la heuristica colaborativa si Inky/Clyde se amontonan.
 3. Revisar metricas visibles o logs de prueba.
-4. Documentar pseudocodigo y resultados.
+4. Documentar pseudocodigo y resultados finales.
 5. Preparar video final.
 
 ## Decision De Diseno Recomendada
@@ -798,7 +802,7 @@ Motivos:
 - Coincide con la regla del examen: solo cambiar direccion en intersecciones.
 - Aprovecha la matriz `MC` ya existente.
 - Aprovecha la informacion codificada en `mapa_codigos.csv`.
-- Facilita calcular distancias reales del laberinto.
+- Facilita calcular vecinos legales y convertir nodos a coordenadas para las distancias heuristicas.
 - Hace mas facil explicar alfa-beta en el reporte.
 
 Flujo esperado:
@@ -810,7 +814,7 @@ fantasma avanza por pixeles
 llega a una interseccion
         |
         v
-se consulta el grafo de intersecciones
+se consulta la matriz de control
         |
         v
 alfa-beta decide la siguiente direccion

@@ -13,6 +13,8 @@ import pandas as pd
 import random
 
 class Ghost:
+    SPRITE_DRAW_Y = 8
+
     def __init__(self,mapa, mc, x_mc, y_mc, xini, yini, dir, tipo):
         #Matriz de control que almacena los IDs de las intersecciones
         self.MC = mc
@@ -50,11 +52,25 @@ class Ghost:
             [1],
             [3]
         ]
+        self.allowed_directions_by_cell = {
+            10: [1, 2],
+            11: [2, 3],
+            12: [0, 1],
+            13: [0, 3],
+            21: [1, 2, 3],
+            22: [0, 2, 3],
+            23: [0, 1, 3],
+            24: [0, 1, 2],
+            25: [0, 1, 2, 3],
+            26: [1],
+            27: [3],
+        }
         self.option = []
         self.dir_inv = 0
         self.controller = None
         self.controller_index = None
         self.path_n = 0
+        self.valid_path_positions = self.build_valid_path_positions()
 
     def loadTextures(self, texturas, id):
         self.texturas = texturas
@@ -73,6 +89,66 @@ class Ghost:
             0 <= z_index < len(self.YPxToMC)
         )
 
+    # Sirve para reconstruir los pasillos validos usando MC.
+    def build_valid_path_positions(self):
+        x_coords = [
+            pixel
+            for pixel, column in enumerate(self.XPxToMC)
+            if column != -1
+        ]
+        y_coords = [
+            pixel
+            for pixel, row in enumerate(self.YPxToMC)
+            if row != -1
+        ]
+
+        path_positions = set()
+        direction_deltas = {
+            0: (-1, 0),
+            1: (0, 1),
+            2: (1, 0),
+            3: (0, -1),
+        }
+
+        for row, cells in enumerate(self.MC):
+            for col, cell_id in enumerate(cells):
+                if cell_id == 0:
+                    continue
+
+                origin_x = x_coords[col] + 20
+                origin_z = y_coords[row] + 20
+                path_positions.add((origin_x, origin_z))
+
+                for direction in self.allowed_directions_by_cell[cell_id]:
+                    row_delta, col_delta = direction_deltas[direction]
+                    next_row = row + row_delta
+                    next_col = col + col_delta
+
+                    while (
+                        0 <= next_row < len(self.MC) and
+                        0 <= next_col < len(self.MC[next_row])
+                    ):
+                        if self.MC[next_row][next_col] != 0:
+                            target_x = x_coords[next_col] + 20
+                            target_z = y_coords[next_row] + 20
+
+                            if origin_x == target_x:
+                                start = min(origin_z, target_z)
+                                end = max(origin_z, target_z)
+                                for z in range(start, end + 1):
+                                    path_positions.add((origin_x, z))
+                            elif origin_z == target_z:
+                                start = min(origin_x, target_x)
+                                end = max(origin_x, target_x)
+                                for x in range(start, end + 1):
+                                    path_positions.add((x, origin_z))
+                            break
+
+                        next_row += row_delta
+                        next_col += col_delta
+
+        return path_positions
+
     # Sirve para calcular a que pixel llegaria el fantasma si toma una direccion.
     def next_pixel_for_direction(self, direction):
         next_x = self.position[0]
@@ -90,7 +166,10 @@ class Ghost:
     # Sirve para evitar que una direccion saque al fantasma del tablero.
     def can_move_direction(self, direction):
         next_x, next_z = self.next_pixel_for_direction(direction)
-        return self.is_inside_board_position(next_x, next_z)
+        return (
+            self.is_inside_board_position(next_x, next_z) and
+            (next_x, next_z) in self.valid_path_positions
+        )
 
     def drawFace(self, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4):
         glBegin(GL_QUADS)
@@ -224,12 +303,16 @@ class Ghost:
     def draw(self):
         glPushMatrix()
         glColor3f(1.0, 1.0, 1.0)
-        glTranslatef(self.position[0], self.position[1], self.position[2])
+        # Se dibuja un poco arriba del plano para que la vista cenital no lo tape.
+        glTranslatef(self.position[0], self.SPRITE_DRAW_Y, self.position[2])
         glScaled(10,1,10)
         #Activate textures
         glEnable(GL_TEXTURE_2D)
+        glEnable(GL_ALPHA_TEST)
+        glAlphaFunc(GL_GREATER, 0.5)
         #front face
         glBindTexture(GL_TEXTURE_2D, self.texturas[self.Id])
-        self.drawFace(-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0)    
-        glDisable(GL_TEXTURE_2D)  
+        self.drawFace(-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0)
+        glDisable(GL_ALPHA_TEST)
+        glDisable(GL_TEXTURE_2D)
         glPopMatrix()

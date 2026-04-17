@@ -2,29 +2,29 @@
 
 ## Objetivo
 
-Se agrego `AI/game_state.py` para representar los estados que usara alfa-beta.
+Se agrego `IA/game_state.py` para representar los estados que usara alfa-beta.
 
-El grafo (`MazeGraph`) sabe como esta conectado el laberinto. Pero alfa-beta necesita algo mas: necesita saber donde estan PacMan y los fantasmas en un momento especifico.
+La matriz de control (`MazeControl`) sabe como esta conectado el laberinto. Pero alfa-beta necesita algo mas: necesita saber donde estan PacMan y los fantasmas en un momento especifico.
 
 Ese "momento especifico" es un estado del juego.
 
 ## Archivos Agregados
 
 ```text
-AI/game_state.py
+IA/game_state.py
 ```
 
 Tambien se actualizo:
 
 ```text
-AI/__init__.py
+IA/__init__.py
 ```
 
-para poder importar las clases y funciones nuevas desde el paquete `AI`.
+para poder importar las clases y funciones nuevas desde el paquete `IA`.
 
 ## ActorState
 
-`ActorState` representa a un personaje dentro del grafo.
+`ActorState` representa a un personaje dentro de la matriz de control.
 
 Puede representar:
 
@@ -121,7 +121,7 @@ Convierte una posicion real del juego a un `ActorState`.
 Ejemplo:
 
 ```python
-actor_from_position(graph, [20, 1, 20], direction=1)
+actor_from_position(maze, [20, 1, 20], direction=1)
 ```
 
 Resultado:
@@ -132,14 +132,14 @@ ActorState(node=(0, 0), direction=1)
 
 Esto sirve para conectar el juego visual con el modelo de busqueda.
 
-### legal_edges
+### legal_moves
 
 Devuelve los movimientos legales de un actor.
 
 Para fantasmas, normalmente se usa:
 
 ```python
-legal_edges(graph, ghost, avoid_reverse=True)
+legal_moves(maze, ghost, avoid_reverse=True)
 ```
 
 Eso aplica la regla:
@@ -157,7 +157,7 @@ Devuelve solo las direcciones legales.
 Ejemplo:
 
 ```python
-legal_directions(graph, actor)
+legal_directions(maze, actor)
 ```
 
 Resultado posible:
@@ -240,9 +240,9 @@ generador inicial de hijos
 Tambien ya se implemento:
 
 ```text
-AI/alpha_beta.py
-AI/heuristics.py
-AI/ghost_controller.py
+IA/alpha_beta.py
+IA/heuristics.py
+IA/ghost_controller.py
 ```
 
 El tabu no esta en un archivo separado. Se guarda en `GameState.tabu` y se actualiza con `with_tabu_item()`.

@@ -2,13 +2,17 @@ from .alpha_beta import (
     SearchStats,
     alpha_beta,
     choose_best_action,
+    choose_best_action_window,
     choose_pack_action,
     choose_pinky_action,
     generate_pack_alpha_beta_children,
     generate_pinky_alpha_beta_children,
     is_capture_state,
     is_pack_capture_state,
+    merge_search_stats,
     order_children,
+    should_continue_pack_search,
+    should_continue_pinky_search,
 )
 from .game_state import (
     TURN_GHOSTS,
@@ -20,7 +24,7 @@ from .game_state import (
     generate_pacman_children,
     generate_single_ghost_children,
     legal_directions,
-    legal_edges,
+    legal_moves,
 )
 from .ghost_controller import PackGhostController, PinkyGhostController
 from .heuristics import (
@@ -34,7 +38,8 @@ from .heuristics import (
     evaluate_pack_state,
     evaluate_pinky_state,
     exit_overlap_penalty,
-    graph_distance,
+    manhattan_distance,
+    node_coordinates,
     pacman_exit_coverage,
     pacman_escape_routes,
     pack_heuristic_components,
@@ -43,7 +48,7 @@ from .heuristics import (
     tabu_penalty,
     useful_separation_score,
 )
-from .maze_graph import Edge, MazeGraph
+from .maze_control import MazeControl, MoveOption
 
 __all__ = [
     "CAPTURE_SCORE",
@@ -54,9 +59,9 @@ __all__ = [
     "TURN_GHOSTS",
     "TURN_PACMAN",
     "ActorState",
-    "Edge",
     "GameState",
-    "MazeGraph",
+    "MazeControl",
+    "MoveOption",
     "PackGhostController",
     "PinkyGhostController",
     "SearchStats",
@@ -64,6 +69,7 @@ __all__ = [
     "actor_from_position",
     "alpha_beta",
     "choose_best_action",
+    "choose_best_action_window",
     "choose_pack_action",
     "choose_pinky_action",
     "evaluate_pack_state",
@@ -76,11 +82,15 @@ __all__ = [
     "is_capture_state",
     "is_pack_capture_state",
     "legal_directions",
-    "legal_edges",
+    "legal_moves",
     "order_children",
+    "merge_search_stats",
+    "should_continue_pack_search",
+    "should_continue_pinky_search",
     "distance_to_pacman",
     "evaluate_pinky_state",
-    "graph_distance",
+    "manhattan_distance",
+    "node_coordinates",
     "pacman_exit_coverage",
     "pacman_escape_routes",
     "pack_heuristic_components",

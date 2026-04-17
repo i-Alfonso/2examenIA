@@ -1,4 +1,4 @@
-from .game_state import legal_edges
+from .game_state import legal_moves
 
 
 CAPTURE_SCORE = 10000.0
@@ -15,22 +15,28 @@ def resolve_node(actor_or_node):
     return actor_or_node
 
 
-# Sirve para calcular la distancia real por pasillos entre dos actores o nodos.
-def graph_distance(graph, origin, destination):
-    origin_node = resolve_node(origin)
-    destination_node = resolve_node(destination)
-    return graph.shortest_distance(origin_node, destination_node)
+# Sirve para obtener coordenadas reales desde un ActorState o un nodo.
+def node_coordinates(maze, actor_or_node):
+    node = resolve_node(actor_or_node)
+    return maze.node_to_pixel(node, include_world_offset=False)
+
+
+# Sirve para calcular distancia Manhattan, sin busqueda de caminos.
+def manhattan_distance(maze, origin, destination):
+    origin_x, origin_z = node_coordinates(maze, origin)
+    destination_x, destination_z = node_coordinates(maze, destination)
+    return abs(origin_x - destination_x) + abs(origin_z - destination_z)
 
 
 # Sirve para medir que tan lejos esta un fantasma especifico de PacMan.
-def distance_to_pacman(graph, state, ghost_index=0):
+def distance_to_pacman(maze, state, ghost_index=0):
     ghost = state.ghosts[ghost_index]
-    return graph_distance(graph, ghost, state.pacman)
+    return manhattan_distance(maze, ghost, state.pacman)
 
 
 # Sirve para contar cuantas salidas tiene PacMan desde su interseccion actual.
-def pacman_escape_routes(graph, state):
-    return len(legal_edges(graph, state.pacman, avoid_reverse=False))
+def pacman_escape_routes(maze, state):
+    return len(legal_moves(maze, state.pacman, avoid_reverse=False))
 
 
 # Sirve para penalizar nodos recientes y reducir ciclos con tabu de horizonte limitado.
@@ -58,18 +64,18 @@ def any_ghost_captures_pacman(state, ghost_indices=None):
 
 # Sirve para medir cuantas salidas de PacMan estan cubiertas por Inky o Clyde.
 def pacman_exit_coverage(
-    graph,
+    maze,
     state,
     ghost_indices=(0, 1),
     coverage_distance=DEFAULT_PACK_COVERAGE_DISTANCE,
 ):
     covered_exits = 0
 
-    for pacman_edge in legal_edges(graph, state.pacman, avoid_reverse=False):
-        exit_node = pacman_edge.target
+    for pacman_move in legal_moves(maze, state.pacman, avoid_reverse=False):
+        exit_node = pacman_move.target
         is_covered = any(
-            graph_distance(
-                graph,
+            manhattan_distance(
+                maze,
                 state.ghosts[ghost_index],
                 exit_node,
             ) <= coverage_distance
@@ -82,26 +88,26 @@ def pacman_exit_coverage(
 
 
 # Sirve para penalizar cuando los dos fantasmas cubren la misma salida principal.
-def exit_overlap_penalty(graph, state, ghost_indices=(0, 1)):
-    pacman_edges = legal_edges(graph, state.pacman, avoid_reverse=False)
+def exit_overlap_penalty(maze, state, ghost_indices=(0, 1)):
+    pacman_edges = legal_moves(maze, state.pacman, avoid_reverse=False)
     if len(pacman_edges) <= 1 or len(ghost_indices) < 2:
         return 0
 
     closest_exits = []
     for ghost_index in ghost_indices:
         ghost = state.ghosts[ghost_index]
-        closest_edge = min(
+        closest_move = min(
             pacman_edges,
-            key=lambda edge: graph_distance(graph, ghost, edge.target),
+            key=lambda move: manhattan_distance(maze, ghost, move.target),
         )
-        closest_exits.append(closest_edge.target)
+        closest_exits.append(closest_move.target)
 
     return 1 if len(set(closest_exits)) < len(closest_exits) else 0
 
 
 # Sirve para premiar que Inky y Clyde esten separados sin quedar demasiado lejos.
 def useful_separation_score(
-    graph,
+    maze,
     state,
     ghost_indices=(0, 1),
     minimum_distance=80,
@@ -112,7 +118,7 @@ def useful_separation_score(
 
     first = state.ghosts[ghost_indices[0]]
     second = state.ghosts[ghost_indices[1]]
-    distance = graph_distance(graph, first, second)
+    distance = manhattan_distance(maze, first, second)
 
     if distance < minimum_distance:
         return -1
@@ -122,9 +128,9 @@ def useful_separation_score(
 
 
 # Sirve para regresar las partes de la evaluacion y poder explicarlas en pruebas/reporte.
-def pinky_heuristic_components(graph, state, ghost_index=0):
-    distance = distance_to_pacman(graph, state, ghost_index=ghost_index)
-    escape_routes = pacman_escape_routes(graph, state)
+def pinky_heuristic_components(maze, state, ghost_index=0):
+    distance = distance_to_pacman(maze, state, ghost_index=ghost_index)
+    escape_routes = pacman_escape_routes(maze, state)
     tabu = tabu_penalty(state, ghost_index=ghost_index)
 
     return {
@@ -136,7 +142,7 @@ def pinky_heuristic_components(graph, state, ghost_index=0):
 
 # Funcion de evaluacion para Pinky: mientras mayor sea el score, mejor para el fantasma.
 def evaluate_pinky_state(
-    graph,
+    maze,
     state,
     ghost_index=0,
     distance_weight=DEFAULT_DISTANCE_WEIGHT,
@@ -145,7 +151,7 @@ def evaluate_pinky_state(
     capture_score=CAPTURE_SCORE,
 ):
     components = pinky_heuristic_components(
-        graph,
+        maze,
         state,
         ghost_index=ghost_index,
     )
@@ -163,30 +169,30 @@ def evaluate_pinky_state(
 
 # Sirve para regresar las partes de la evaluacion colaborativa Inky/Clyde.
 def pack_heuristic_components(
-    graph,
+    maze,
     state,
     ghost_indices=(0, 1),
     coverage_distance=DEFAULT_PACK_COVERAGE_DISTANCE,
 ):
     distances = tuple(
-        distance_to_pacman(graph, state, ghost_index=ghost_index)
+        distance_to_pacman(maze, state, ghost_index=ghost_index)
         for ghost_index in ghost_indices
     )
-    escape_routes = pacman_escape_routes(graph, state)
+    escape_routes = pacman_escape_routes(maze, state)
     covered_exits = pacman_exit_coverage(
-        graph,
+        maze,
         state,
         ghost_indices=ghost_indices,
         coverage_distance=coverage_distance,
     )
     free_routes = max(0, escape_routes - covered_exits)
     separation = useful_separation_score(
-        graph,
+        maze,
         state,
         ghost_indices=ghost_indices,
     )
     overlap = exit_overlap_penalty(
-        graph,
+        maze,
         state,
         ghost_indices=ghost_indices,
     )
@@ -210,7 +216,7 @@ def pack_heuristic_components(
 
 # Funcion de evaluacion para Inky y Clyde: mayor score significa mejor encierro.
 def evaluate_pack_state(
-    graph,
+    maze,
     state,
     ghost_indices=(0, 1),
     total_distance_weight=0.65,
@@ -227,7 +233,7 @@ def evaluate_pack_state(
         return capture_score
 
     components = pack_heuristic_components(
-        graph,
+        maze,
         state,
         ghost_indices=ghost_indices,
     )

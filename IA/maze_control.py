@@ -1,15 +1,14 @@
 from dataclasses import dataclass
-from heapq import heappop, heappush
 
 
 @dataclass(frozen=True)
-class Edge:
+class MoveOption:
     target: tuple[int, int]
     direction: int
     cost: int
 
 
-class MazeGraph:
+class MazeControl:
     DIRECTION_UP = 0
     DIRECTION_RIGHT = 1
     DIRECTION_DOWN = 2
@@ -50,71 +49,69 @@ class MazeGraph:
         self.world_offset = world_offset
         self._validate_inputs()
 
-        # Lista de nodos, quitando ceros, para mapear
+        # Lista de intersecciones validas: toda celda distinta de cero en MC.
         self.nodes = tuple(
             (row_index, col_index)
             for row_index, row in enumerate(self.control_matrix)
             for col_index, cell_id in enumerate(row)
             if cell_id != 0
         )
-        # Cad elemento es una interseccion , es mas rapido preguntar si existe un nodo usando' set'
+        # Permite validar rapido si una interseccion existe.
         self.node_set = set(self.nodes)
         self._x_to_col = {x: col for col, x in enumerate(self.x_coords)}
         self._y_to_row = {y: row for row, y in enumerate(self.y_coords)}
-        self.adjacency = self._build_adjacency()
-        self._edge_lookup = {
-            (node, edge.target): edge
-            for node, edges in self.adjacency.items()
-            for edge in edges
-        }
-        self._distance_cache = {}
 
-    # Esa función devuelve cuántos nodos reales tiene el grafo.
+    # Devuelve cuantas intersecciones reales hay en MC.
     @property
     def node_count(self):
         return len(self.nodes)
 
-    # Esa propiedad cuenta cuántas aristas/conexiones tiene el grafo.
+    # Cuenta las conexiones directas calculadas desde MC.
     @property
     def edge_count(self):
-        return sum(len(edges) for edges in self.adjacency.values())
+        return sum(len(self.get_neighbors(node)) for node in self.nodes)
 
-    # Sirve para saber qué tipo de intersección es un nodo.
+    # Sirve para saber que tipo de interseccion es un nodo.
     def cell_id(self, node):
         self._require_node(node)
         row, col = node
         return self.control_matrix[row][col]
 
-
     # Sirve para obtener todos los movimientos posibles desde un nodo.
     def get_neighbors(self, node):
         self._require_node(node)
-        return self.adjacency[node]
+        cell_id = self.cell_id(node)
+        moves = []
+        for direction in self.ALLOWED_DIRECTIONS[cell_id]:
+            move = self._scan_to_next_node(node, direction)
+            if move is not None:
+                moves.append(move)
+        return tuple(moves)
 
     # Sirve para obtener solo las direcciones posibles, sin el nodo destino ni costo.
     def direction_options(self, node):
-        return tuple(edge.direction for edge in self.get_neighbors(node))
+        return tuple(move.direction for move in self.get_neighbors(node))
 
     # Sirve para : si estoy en este nodo y tomo esta dirección, ¿a dónde llego?
     def next_node(self, node, direction):
-        for edge in self.get_neighbors(node):
-            if edge.direction == direction:
-                return edge
+        for move in self.get_neighbors(node):
+            if move.direction == direction:
+                return move
         return None
 
     # Sirve para saber cuánto cuesta ir de un nodo a otro nodo vecino.
     def get_cost(self, origin, destination):
-        edge = self._edge_lookup.get((origin, destination))
-        if edge is None:
-            raise KeyError(f"No edge from {origin} to {destination}")
-        return edge.cost
+        move = self._move_between(origin, destination)
+        if move is None:
+            raise KeyError(f"No move from {origin} to {destination}")
+        return move.cost
 
     # Sirve para saber qué dirección conecta dos nodos vecinos.
     def direction_between(self, origin, destination):
-        edge = self._edge_lookup.get((origin, destination))
-        if edge is None:
-            raise KeyError(f"No edge from {origin} to {destination}")
-        return edge.direction
+        move = self._move_between(origin, destination)
+        if move is None:
+            raise KeyError(f"No move from {origin} to {destination}")
+        return move.direction
 
     # Sirve para obtener la dirección contraria.
     def inverse_direction(self, direction):
@@ -130,7 +127,7 @@ class MazeGraph:
             return x + self.world_offset, z + self.world_offset
         return x, z
 
-    # convierte coordenadas reales del juego a nodo del grafo.
+    # Convierte coordenadas reales del juego a una interseccion de MC.
     def pixel_to_node(self, x, z, include_world_offset=True, require_exact=True):
         if include_world_offset:
             x -= self.world_offset
@@ -151,53 +148,6 @@ class MazeGraph:
             ),
         )
 
-    # Calcula la distancia más corta entre dos nodos usando Dijkstra.
-    def shortest_distance(self, origin, destination):
-        self._require_node(origin)
-        self._require_node(destination)
-
-        cache_key = (origin, destination)
-        cached_distance = self._distance_cache.get(cache_key)
-        if cached_distance is not None:
-            return cached_distance
-
-        distances = self._dijkstra(origin)
-        distance = distances[destination]
-        self._distance_cache[cache_key] = distance
-        return distance
-
-    # Devuelve el camino completo de nodos, no solo la distancia.
-    def shortest_path(self, origin, destination):
-        self._require_node(origin)
-        self._require_node(destination)
-
-        distances = {origin: 0}
-        previous = {}
-        queue = [(0, origin)]
-
-        while queue:
-            current_distance, current = heappop(queue)
-            if current == destination:
-                break
-            if current_distance != distances[current]:
-                continue
-
-            for edge in self.adjacency[current]:
-                next_distance = current_distance + edge.cost
-                if next_distance < distances.get(edge.target, float("inf")):
-                    distances[edge.target] = next_distance
-                    previous[edge.target] = current
-                    heappush(queue, (next_distance, edge.target))
-
-        if destination not in distances:
-            return []
-
-        path = [destination]
-        while path[-1] != origin:
-            path.append(previous[path[-1]])
-        path.reverse()
-        return path
-
     # Devuelve todos los nodos alcanzables desde un nodo inicial.
     def connected_nodes(self, start=None):
         if start is None:
@@ -211,21 +161,21 @@ class MazeGraph:
             if node in visited:
                 continue
             visited.add(node)
-            stack.extend(edge.target for edge in self.adjacency[node])
+            stack.extend(move.target for move in self.get_neighbors(node))
         return visited
 
     # Dice si todos los nodos están conectados.
     def is_connected(self):
         return len(self.connected_nodes()) == self.node_count
 
-    # Busca conexiones que no tengan regreso. ( no hay asimetricas )
+    # Busca conexiones que no tengan regreso en MC.
     def find_asymmetric_edges(self):
         asymmetric = []
-        for origin, edges in self.adjacency.items():
-            for edge in edges:
-                reverse = self._edge_lookup.get((edge.target, origin))
+        for origin in self.nodes:
+            for move in self.get_neighbors(origin):
+                reverse = self._move_between(move.target, origin)
                 if reverse is None:
-                    asymmetric.append((origin, edge.target))
+                    asymmetric.append((origin, move.target))
         return asymmetric
 
     # Junta varias validaciones en un diccionario.
@@ -246,22 +196,14 @@ class MazeGraph:
 
         return result
 
-    # Construye la lista de adyacencia.
-    def _build_adjacency(self):
-        adjacency = {node: [] for node in self.nodes}
-
-        for node in self.nodes:
-            row, col = node
-            cell_id = self.control_matrix[row][col]
-            for direction in self.ALLOWED_DIRECTIONS[cell_id]:
-                edge = self._scan_to_next_node(node, direction)
-                if edge is not None:
-                    adjacency[node].append(edge)
-
-        return {
-            node: tuple(edges)
-            for node, edges in adjacency.items()
-        }
+    # Busca el movimiento directo que conecta dos intersecciones.
+    def _move_between(self, origin, destination):
+        self._require_node(origin)
+        self._require_node(destination)
+        for move in self.get_neighbors(origin):
+            if move.target == destination:
+                return move
+        return None
 
     # Busca la siguiente intersección en una dirección.
     def _scan_to_next_node(self, node, direction):
@@ -276,30 +218,12 @@ class MazeGraph:
                     abs(self.x_coords[next_col] - self.x_coords[col]) +
                     abs(self.y_coords[next_row] - self.y_coords[row])
                 )
-                return Edge((next_row, next_col), direction, cost)
+                return MoveOption((next_row, next_col), direction, cost)
 
             next_row += row_delta
             next_col += col_delta
 
         return None
-
-    # Implementa el algoritmo de Dijkstra.
-    def _dijkstra(self, origin):
-        distances = {origin: 0}
-        queue = [(0, origin)]
-
-        while queue:
-            current_distance, current = heappop(queue)
-            if current_distance != distances[current]:
-                continue
-
-            for edge in self.adjacency[current]:
-                next_distance = current_distance + edge.cost
-                if next_distance < distances.get(edge.target, float("inf")):
-                    distances[edge.target] = next_distance
-                    heappush(queue, (next_distance, edge.target))
-
-        return distances
 
     # Valida que los datos iniciales estén correctos.
     def _validate_inputs(self):
@@ -336,7 +260,7 @@ class MazeGraph:
             0 <= col < len(self.control_matrix[row])
         )
 
-    # Valida que un nodo exista en el grafo.
+    # Valida que un nodo exista en MC.
     def _require_node(self, node):
         if node not in self.node_set:
             raise KeyError(f"Unknown maze node: {node}")

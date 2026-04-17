@@ -139,13 +139,13 @@ Eso permite que `Pacman.py` controle si la direccion se usa inmediatamente, se g
 
 ## Relacion Con La IA
 
-Este cambio no pertenece directamente al modulo `AI`.
+Este cambio no pertenece directamente al modulo `IA`.
 
 Es una mejora del control del jugador, por eso se implemento en `Pacman.py`.
 
-La carpeta `AI` debe reservarse para:
+La carpeta `IA` debe reservarse para:
 
-- grafo del laberinto,
+- matriz de control del laberinto,
 - generacion de hijos,
 - poda alfa-beta,
 - heuristicas,

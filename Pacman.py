@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 
 class Pacman:
+    SPRITE_DRAW_Y = 8
+
     def __init__(self,mapa, mc, x_mc, y_mc):
         #Matriz de control que almacena los IDs de las intersecciones
         self.MC = mc
@@ -209,12 +211,16 @@ class Pacman:
     def draw(self):
         glPushMatrix()
         glColor3f(1.0, 1.0, 1.0)
-        glTranslatef(self.position[0], self.position[1], self.position[2])
+        # Se dibuja un poco arriba del plano para que la vista cenital no lo tape.
+        glTranslatef(self.position[0], self.SPRITE_DRAW_Y, self.position[2])
         glScaled(10,1,10)
         #Activate textures
         glEnable(GL_TEXTURE_2D)
+        glEnable(GL_ALPHA_TEST)
+        glAlphaFunc(GL_GREATER, 0.5)
         #front face
         glBindTexture(GL_TEXTURE_2D, self.texturas[self.Id])
-        self.drawFace(-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0)    
-        glDisable(GL_TEXTURE_2D)  
-        glPopMatrix()        
+        self.drawFace(-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0)
+        glDisable(GL_ALPHA_TEST)
+        glDisable(GL_TEXTURE_2D)
+        glPopMatrix()

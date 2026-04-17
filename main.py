@@ -16,7 +16,7 @@ import sys
 sys.path.append('..')
 from Pacman import Pacman
 from Ghost import Ghost
-from AI import MazeGraph, PackGhostController, PinkyGhostController
+from IA import MazeControl, PackGhostController, PinkyGhostController
 
 
 screen_width = 900
@@ -27,15 +27,15 @@ ZNEAR=1.0
 ZFAR=900.0
 #Variables para definir la posicion del observador
 #gluLookAt(EYE_X,EYE_Y,EYE_Z,CENTER_X,CENTER_Y,CENTER_Z,UP_X,UP_Y,UP_Z)
-EYE_X = 300.0 + 200.0
-EYE_Y = 200.0
-EYE_Z = 300.0 + 200.0
+EYE_X = 200.0
+EYE_Y = 460.0
+EYE_Z = 200.0
 CENTER_X = 0 + 200
 CENTER_Y = 0
 CENTER_Z = 0 + 200
 UP_X=0
-UP_Y=1
-UP_Z=0
+UP_Y=0
+UP_Z=-1
 #Variables para dibujar los ejes del sistema
 X_MIN=-500
 X_MAX=500
@@ -49,8 +49,8 @@ DimBoard = 400
 theta = 0.0
 radius = 300
 CAMERA_HEIGHT_STEP = 2.0
-CAMERA_MIN_Y = 20.0
-CAMERA_MAX_Y = 500.0
+CAMERA_MIN_Y = 250.0
+CAMERA_MAX_Y = 800.0
 
 
 #Arreglo para el manejo de texturas
@@ -118,17 +118,34 @@ YPxToMC[282] = 7
 YPxToMC[320] = 8
 YPxToMC[360] = 9
 
-#pathfinding variables
+#Variables heredadas del proyecto base. No se usan para resolver la IA.
 path = []
 grid = []
 
-DEBUG_AI_LOGS = True
+# Logs detallados de busqueda apagados para no llenar la consola durante el juego.
+DEBUG_AI_LOGS = False
 AI_LOG_INTERVAL_FRAMES = 60
 frame_count = 0
+CAPTURE_LOGS = os.environ.get("PACMAN_CAPTURE_LOGS", "1") == "1"
+CAPTURE_DISTANCE = 10
+capture_count = 0
+capture_round_start_ms = 0
+active_capture_ghosts = set()
+capture_type_counts = {
+    "aleatorio": 0,
+    "IA individual alpha-beta": 0,
+    "caza en manada": 0,
+}
+ghost_capture_types = [
+    ("Blinky", "aleatorio"),
+    ("Pinky", "IA individual alpha-beta"),
+    ("Inky", "caza en manada"),
+    ("Clyde", "caza en manada"),
+]
 
-maze_graph = MazeGraph(MC, xMC, yMC)
-pinky_controller = PinkyGhostController(maze_graph, depth=4)
-pack_controller = PackGhostController(maze_graph, depth=3)
+maze_control = MazeControl(MC, xMC, yMC)
+pinky_controller = PinkyGhostController(maze_control, depth=4)
+pack_controller = PackGhostController(maze_control, depth=3)
 
 #pacman object
 pc = Pacman(matrix, MC, XPxToMC, YPxToMC)
@@ -137,13 +154,10 @@ ghosts = []
 ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 380, 2, 0))
 ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 20, 0, 1))
 ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 380, 3, 1))
-ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 20, 20, 1, 1))
+ghosts.append(Ghost(matrix, MC, XPxToMC, YPxToMC, 378, 188, 3, 1))
 ghosts[1].setController(pinky_controller)
 ghosts[2].setController(pack_controller, ghost_index=0)
 ghosts[3].setController(pack_controller, ghost_index=1)
-
-
-pygame.init()
 
 def Axis():
     glShadeModel(GL_FLAT)
@@ -168,7 +182,50 @@ def Axis():
     glEnd()
     glLineWidth(1.0)
 
-def Texturas(filepath):
+def apply_border_black_transparency(image):
+    # Elimina solo el negro conectado al borde de la imagen.
+    # Asi no se borran detalles negros internos del sprite.
+    pixels = pygame.surfarray.pixels3d(image)
+    alpha = pygame.surfarray.pixels_alpha(image)
+    width, height = image.get_size()
+    visited = np.zeros((width, height), dtype=bool)
+    stack = []
+
+    for x in range(width):
+        stack.append((x, 0))
+        stack.append((x, height - 1))
+    for y in range(height):
+        stack.append((0, y))
+        stack.append((width - 1, y))
+
+    while stack:
+        x, y = stack.pop()
+        if visited[x, y]:
+            continue
+        visited[x, y] = True
+
+        if not (
+            pixels[x, y, 0] == 0 and
+            pixels[x, y, 1] == 0 and
+            pixels[x, y, 2] == 0
+        ):
+            continue
+
+        alpha[x, y] = 0
+
+        if x > 0:
+            stack.append((x - 1, y))
+        if x < width - 1:
+            stack.append((x + 1, y))
+        if y > 0:
+            stack.append((x, y - 1))
+        if y < height - 1:
+            stack.append((x, y + 1))
+
+    del pixels
+    del alpha
+
+def Texturas(filepath, transparent_border_black=False):
     textures.append(glGenTextures(1))
     id = len(textures) - 1
     glBindTexture(GL_TEXTURE_2D, textures[id])
@@ -176,11 +233,15 @@ def Texturas(filepath):
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T, GL_CLAMP)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    image = pygame.image.load(filepath).convert()
+    if transparent_border_black:
+        image = pygame.image.load(filepath).convert_alpha()
+        apply_border_black_transparency(image)
+    else:
+        image = pygame.image.load(filepath).convert()
     w, h = image.get_rect().size
     image_data = pygame.image.tostring(image,"RGBA")
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
-    glGenerateMipmap(GL_TEXTURE_2D) 
+    glGenerateMipmap(GL_TEXTURE_2D)
     
 def Init():
     screen = pygame.display.set_mode(
@@ -200,15 +261,15 @@ def Init():
     #textures[0]: plano
     Texturas(file_1)
     #textures[1]: pacman
-    Texturas(img_pacman)
+    Texturas(img_pacman, transparent_border_black=True)
     #textures[2]: Blinky rojo
-    Texturas(img_blinky)
+    Texturas(img_blinky, transparent_border_black=True)
     #textures[3]: Pinky rosa
-    Texturas(img_pinky)
+    Texturas(img_pinky, transparent_border_black=True)
     #textures[4]: Inky azul/cian
-    Texturas(img_inky)
+    Texturas(img_inky, transparent_border_black=True)
     #textures[5]: Clyde naranja
-    Texturas(img_clyde)
+    Texturas(img_clyde, transparent_border_black=True)
 
     #se pasan las texturas a los objetos
     pc.loadTextures(textures,1)
@@ -232,7 +293,7 @@ def PlanoTexturizado():
     glVertex3d(DimBoard, 0, DimBoard)
     glTexCoord2f(1.0, 0.0)
     glVertex3d(DimBoard, 0, 0)
-    glEnd()              
+    glEnd()
     glDisable(GL_TEXTURE_2D)
 
 #Se mueve al observador circularmente al rededor del plano XZ
@@ -240,10 +301,17 @@ def lookat():
     global EYE_X
     global EYE_Y
     global EYE_Z
+    global UP_X
+    global UP_Z
     global radius
     center = DimBoard / 2
-    EYE_X = radius * (math.cos(math.radians(theta)) + math.sin(math.radians(theta))) + center
-    EYE_Z = radius * (-math.sin(math.radians(theta)) + math.cos(math.radians(theta))) + center
+    # Vista cenital: la camara se queda sobre el centro del tablero.
+    EYE_X = center
+    EYE_Z = center
+    # Desde arriba, el vector UP no puede apuntar en Y porque queda alineado
+    # con la direccion de la mirada. Se rota en XZ para conservar las flechas.
+    UP_X = math.sin(math.radians(theta))
+    UP_Z = -math.cos(math.radians(theta))
     glLoadIdentity()
     gluLookAt(EYE_X,EYE_Y,EYE_Z,CENTER_X,CENTER_Y,CENTER_Z,UP_X,UP_Y,UP_Z)
 
@@ -265,7 +333,57 @@ def display():
         g.draw()
         g.update2(pc.position, pc.direction)
     log_ai_decisions()
+    log_capture_events()
     frame_count += 1
+
+def is_capture_distance(ghost):
+    return (
+        abs(ghost.position[0] - pc.position[0]) <= CAPTURE_DISTANCE and
+        abs(ghost.position[2] - pc.position[2]) <= CAPTURE_DISTANCE
+    )
+
+def log_capture_events():
+    global capture_count
+    global capture_round_start_ms
+
+    if not CAPTURE_LOGS:
+        return
+
+    current_captures = {
+        index
+        for index, ghost in enumerate(ghosts)
+        if is_capture_distance(ghost)
+    }
+    new_captures = current_captures - active_capture_ghosts
+
+    if new_captures:
+        capture_count += 1
+        now_ms = pygame.time.get_ticks()
+        elapsed_seconds = (now_ms - capture_round_start_ms) / 1000
+        capture_ghosts = [
+            ghost_capture_types[ghost_index]
+            for ghost_index in sorted(new_captures)
+        ]
+        ghost_names = [name for name, _ in capture_ghosts]
+        ghost_types = sorted({ghost_type for _, ghost_type in capture_ghosts})
+
+        for ghost_type in ghost_types:
+            capture_type_counts[ghost_type] += 1
+
+        print(
+            "[CAPTURE] "
+            f"total={capture_count} "
+            f"ghosts={','.join(ghost_names)} "
+            f"types={','.join(ghost_types)} "
+            f"time={elapsed_seconds:.2f}s "
+            f"frame={frame_count} "
+            f"pacman_pos={pc.position} "
+            f"type_counts={capture_type_counts}"
+        )
+        capture_round_start_ms = now_ms
+
+    active_capture_ghosts.clear()
+    active_capture_ghosts.update(current_captures)
 
 def format_search_stats(stats):
     if stats is None:
@@ -275,7 +393,10 @@ def format_search_stats(stats):
         f"leaves={stats.leaves_evaluated} "
         f"alpha_cuts={stats.alpha_cuts} "
         f"beta_cuts={stats.beta_cuts} "
-        f"depth={stats.max_depth_reached}"
+        f"depth={stats.max_depth_reached} "
+        f"aspiration={stats.aspiration_searches} "
+        f"research={stats.aspiration_researches} "
+        f"continuations={stats.heuristic_continuations}"
     )
 
 def log_ai_decisions():
@@ -310,54 +431,64 @@ def log_ai_decisions():
         f"components={pack_components}"
     )
 
-done = False
-Init()
-#finding(matrix, (xarray[0]-20,zarray[0]-20), (xarray[9]-20,zarray[9]-20))
-while not done:
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                done = True
-    
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_RIGHT]:
-        if theta > 359.0:
-            theta = 0
-        else:
-            theta += 1.0
-        lookat()
-    if keys[pygame.K_LEFT]:
-        if theta < 1.0:
-            theta = 360.0
-        else:
-            theta += -1.0
-        lookat()
-    if keys[pygame.K_UP]:
-        EYE_Y = min(EYE_Y + CAMERA_HEIGHT_STEP, CAMERA_MAX_Y)
-        lookat()
-    if keys[pygame.K_DOWN]:
-        EYE_Y = max(EYE_Y - CAMERA_HEIGHT_STEP, CAMERA_MIN_Y)
-        lookat()
-    #Se verifica la direccion para el pacman
-    pacman_dir = -1
-    if keys[pygame.K_w]:
-        #direccion 0
-        pacman_dir = 0
-    elif keys[pygame.K_d]:
-        #direccion 1
-        pacman_dir = 1
-    elif keys[pygame.K_s]:
-        #direccion 2
-        pacman_dir = 2
-    elif keys[pygame.K_a]:
-        #direccion 1
-        pacman_dir = 3
-    pc.updateWithBuffer(pacman_dir)
+def run_game():
+    global EYE_Y
+    global theta
+    global capture_round_start_ms
 
-    display()
-    pygame.display.flip()
-    pygame.time.wait(10)
+    done = False
+    pygame.init()
+    capture_round_start_ms = pygame.time.get_ticks()
+    Init()
+    #finding(matrix, (xarray[0]-20,zarray[0]-20), (xarray[9]-20,zarray[9]-20))
+    while not done:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    done = True
 
-pygame.quit()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_RIGHT]:
+            if theta > 359.0:
+                theta = 0
+            else:
+                theta += 1.0
+            lookat()
+        if keys[pygame.K_LEFT]:
+            if theta < 1.0:
+                theta = 360.0
+            else:
+                theta += -1.0
+            lookat()
+        if keys[pygame.K_UP]:
+            EYE_Y = min(EYE_Y + CAMERA_HEIGHT_STEP, CAMERA_MAX_Y)
+            lookat()
+        if keys[pygame.K_DOWN]:
+            EYE_Y = max(EYE_Y - CAMERA_HEIGHT_STEP, CAMERA_MIN_Y)
+            lookat()
+        #Se verifica la direccion para el pacman
+        pacman_dir = -1
+        if keys[pygame.K_w]:
+            #direccion 0
+            pacman_dir = 0
+        elif keys[pygame.K_d]:
+            #direccion 1
+            pacman_dir = 1
+        elif keys[pygame.K_s]:
+            #direccion 2
+            pacman_dir = 2
+        elif keys[pygame.K_a]:
+            #direccion 1
+            pacman_dir = 3
+        pc.updateWithBuffer(pacman_dir)
+
+        display()
+        pygame.display.flip()
+        pygame.time.wait(10)
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    run_game()
     
 

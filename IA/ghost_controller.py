@@ -4,10 +4,19 @@ from .heuristics import pack_heuristic_components, pinky_heuristic_components
 
 
 class PinkyGhostController:
-    def __init__(self, graph, depth=4, tabu_horizon=4):
-        self.graph = graph
+    def __init__(
+        self,
+        maze,
+        depth=4,
+        tabu_horizon=4,
+        aspiration_window=80,
+        heuristic_continuation_depth=1,
+    ):
+        self.maze = maze
         self.depth = depth
         self.tabu_horizon = tabu_horizon
+        self.aspiration_window = aspiration_window
+        self.heuristic_continuation_depth = heuristic_continuation_depth
         self.last_action = None
         self.last_value = None
         self.last_stats = None
@@ -22,13 +31,13 @@ class PinkyGhostController:
         pacman_direction,
     ):
         ghost = actor_from_position(
-            self.graph,
+            self.maze,
             ghost_position,
             ghost_direction,
             require_exact=True,
         )
         pacman = actor_from_position(
-            self.graph,
+            self.maze,
             pacman_position,
             pacman_direction,
             require_exact=False,
@@ -55,23 +64,35 @@ class PinkyGhostController:
             pacman_direction,
         )
         action, value, stats = choose_pinky_action(
-            self.graph,
+            self.maze,
             state,
             depth=self.depth,
             tabu_horizon=self.tabu_horizon,
+            aspiration_value=self.last_value,
+            aspiration_window=self.aspiration_window,
+            heuristic_continuation_depth=self.heuristic_continuation_depth,
         )
         self.last_action = action
         self.last_value = value
         self.last_stats = stats
-        self.last_components = pinky_heuristic_components(self.graph, state)
+        self.last_components = pinky_heuristic_components(self.maze, state)
         return action
 
 
 class PackGhostController:
-    def __init__(self, graph, depth=3, tabu_horizon=4):
-        self.graph = graph
+    def __init__(
+        self,
+        maze,
+        depth=3,
+        tabu_horizon=4,
+        aspiration_window=120,
+        heuristic_continuation_depth=1,
+    ):
+        self.maze = maze
         self.depth = depth
         self.tabu_horizon = tabu_horizon
+        self.aspiration_window = aspiration_window
+        self.heuristic_continuation_depth = heuristic_continuation_depth
         self.last_action = None
         self.last_value = None
         self.last_stats = None
@@ -114,19 +135,19 @@ class PackGhostController:
         ) = self._snapshot
 
         first_ghost = actor_from_position(
-            self.graph,
+            self.maze,
             first_ghost_position,
             first_ghost_direction,
             require_exact=False,
         )
         second_ghost = actor_from_position(
-            self.graph,
+            self.maze,
             second_ghost_position,
             second_ghost_direction,
             require_exact=False,
         )
         pacman = actor_from_position(
-            self.graph,
+            self.maze,
             pacman_position,
             pacman_direction,
             require_exact=False,
@@ -148,15 +169,18 @@ class PackGhostController:
 
         state = self.build_state()
         actions, value, stats = choose_pack_action(
-            self.graph,
+            self.maze,
             state,
             depth=self.depth,
             tabu_horizon=self.tabu_horizon,
+            aspiration_value=self.last_value,
+            aspiration_window=self.aspiration_window,
+            heuristic_continuation_depth=self.heuristic_continuation_depth,
         )
         self.last_action = actions
         self.last_value = value
         self.last_stats = stats
-        self.last_components = pack_heuristic_components(self.graph, state)
+        self.last_components = pack_heuristic_components(self.maze, state)
         self._cached_key = self._snapshot
         self._cached_actions = actions
         return actions

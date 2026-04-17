@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Se agrego `AI/heuristics.py` para definir funciones de evaluacion que puedan usar los fantasmas con poda alfa-beta.
+Se agrego `IA/heuristics.py` para definir funciones de evaluacion que puedan usar los fantasmas con poda alfa-beta.
 
 Primero se implemento Pinky, el fantasma rosa que persigue a PacMan usando alfa-beta individual.
 
@@ -11,7 +11,7 @@ Despues se agrego la evaluacion colaborativa para Inky y Clyde, cuyo objetivo no
 ## Archivo Agregado
 
 ```text
-AI/heuristics.py
+IA/heuristics.py
 ```
 
 ## Idea Principal
@@ -20,7 +20,7 @@ Alfa-beta necesita una forma de decidir si un estado es bueno o malo.
 
 Para Pinky, un estado es mejor cuando:
 
-- Pinky esta mas cerca de PacMan por caminos reales del laberinto.
+- Pinky esta mas cerca de PacMan segun una distancia heuristica.
 - PacMan tiene menos rutas de escape desde su interseccion.
 - Pinky evita repetir estados/nodos recientes cuando se use tabu.
 
@@ -33,30 +33,29 @@ score bajo = peor para Pinky
 
 ## Componentes Heuristicos De Pinky
 
-### 1. Distancia Real A PacMan
+### 1. Distancia Heuristica A PacMan
 
 Se calcula con:
 
 ```python
-distance_to_pacman(graph, state, ghost_index=0)
+distance_to_pacman(maze, state, ghost_index=0)
 ```
 
-Esta funcion usa:
+Esta funcion usa por defecto:
 
 ```python
-graph.shortest_distance(...)
+manhattan_distance(...)
 ```
 
-Por lo tanto, mide distancia real por pasillos usando Dijkstra.
-
-No usa distancia en linea recta porque el laberinto tiene paredes.
-
-Ejemplo:
+La distancia configurada por defecto es Manhattan:
 
 ```text
-Pinky puede estar visualmente cerca de PacMan,
-pero si hay una pared en medio, la distancia real puede ser grande.
+abs(x1 - x2) + abs(y1 - y2)
 ```
+
+No se usa camino minimo ni pathfinding.
+
+La razon es que alfa-beta debe decidir con simulacion adversarial. La distancia solo es una estimacion de cercania entre nodos.
 
 Este componente se usa de forma negativa:
 
@@ -70,7 +69,7 @@ mayor distancia = peor score
 Se calcula con:
 
 ```python
-pacman_escape_routes(graph, state)
+pacman_escape_routes(maze, state)
 ```
 
 Cuenta cuantas direcciones legales tiene PacMan desde su nodo actual.
@@ -117,14 +116,14 @@ regresar izquierda
 La funcion principal es:
 
 ```python
-evaluate_pinky_state(graph, state, ghost_index=0)
+evaluate_pinky_state(maze, state, ghost_index=0)
 ```
 
 Formula conceptual:
 
 ```text
 score =
-  - distancia_real_a_PacMan
+  - distancia_heuristica_a_PacMan
   - peso_escape * rutas_de_escape_de_PacMan
   - peso_tabu * penalizacion_tabu
 ```
@@ -157,7 +156,7 @@ Definir una funcion de evaluacion para alfa-beta con al menos dos componentes he
 Esta evaluacion tiene al menos dos componentes principales:
 
 ```text
-1. distancia real por el laberinto entre Pinky y PacMan
+1. distancia Manhattan entre Pinky y PacMan
 2. numero de rutas de escape de PacMan
 ```
 
@@ -167,14 +166,14 @@ Ademas incluye:
 3. penalizacion tabu
 ```
 
-La decision final de Pinky se toma desde `AI/alpha_beta.py` con `choose_pinky_action()`.
+La decision final de Pinky se toma desde `IA/alpha_beta.py` con `choose_pinky_action()`.
 
 ## Componentes Heuristicos De Inky/Clyde
 
 Para los dos fantasmas colaborativos se agrego:
 
 ```python
-evaluate_pack_state(graph, state)
+evaluate_pack_state(maze, state)
 ```
 
 Esta funcion evalua un estado donde `state.ghosts` contiene dos fantasmas:
@@ -189,7 +188,7 @@ La idea es premiar estados donde PacMan quede con menos salidas utiles.
 Componentes:
 
 ```text
-distancia total de Inky/Clyde a PacMan
+distancia total heuristica de Inky/Clyde a PacMan
 distancia del fantasma mas cercano a PacMan
 rutas de escape de PacMan
 salidas cubiertas por algun fantasma
@@ -204,7 +203,7 @@ penalizacion tabu
 Se calcula con:
 
 ```python
-pacman_exit_coverage(graph, state)
+pacman_exit_coverage(maze, state)
 ```
 
 Por cada salida de PacMan, se revisa si Inky o Clyde estan cerca de esa salida. Si alguno esta dentro del rango definido por `DEFAULT_PACK_COVERAGE_DISTANCE`, esa salida cuenta como cubierta.
@@ -216,7 +215,7 @@ Esto evita que ambos fantasmas persigan por el mismo pasillo sin cerrar otras ru
 Se calcula con:
 
 ```python
-useful_separation_score(graph, state)
+useful_separation_score(maze, state)
 ```
 
 La separacion se evalua asi:
@@ -232,7 +231,7 @@ demasiado lejos = neutro
 Se calcula con:
 
 ```python
-exit_overlap_penalty(graph, state)
+exit_overlap_penalty(maze, state)
 ```
 
 Penaliza cuando Inky y Clyde estan cubriendo la misma salida principal de PacMan. Eso ayuda a que trabajen en rutas distintas.
@@ -265,20 +264,22 @@ Permite usar tanto un `ActorState` como un nodo directo.
 resolve_node(actor_or_node)
 ```
 
-### graph_distance
+### manhattan_distance
 
-Calcula distancia real entre dos actores o nodos.
+Calcula la distancia heuristica entre dos actores o nodos.
 
 ```python
-graph_distance(graph, origin, destination)
+manhattan_distance(maze, origin, destination)
 ```
+
+Por defecto usa Manhattan y no hace busqueda de camino minimo.
 
 ### distance_to_pacman
 
-Calcula distancia real entre un fantasma y PacMan.
+Calcula distancia heuristica entre un fantasma y PacMan.
 
 ```python
-distance_to_pacman(graph, state, ghost_index=0)
+distance_to_pacman(maze, state, ghost_index=0)
 ```
 
 ### pacman_escape_routes
@@ -286,7 +287,7 @@ distance_to_pacman(graph, state, ghost_index=0)
 Cuenta las salidas legales de PacMan.
 
 ```python
-pacman_escape_routes(graph, state)
+pacman_escape_routes(maze, state)
 ```
 
 ### tabu_penalty
@@ -302,7 +303,7 @@ tabu_penalty(state, ghost_index=0)
 Devuelve las partes de la evaluacion por separado.
 
 ```python
-pinky_heuristic_components(graph, state)
+pinky_heuristic_components(maze, state)
 ```
 
 Esto sirve para imprimir, depurar y explicar en el reporte.
@@ -312,7 +313,7 @@ Esto sirve para imprimir, depurar y explicar en el reporte.
 Devuelve el score final para Pinky.
 
 ```python
-evaluate_pinky_state(graph, state)
+evaluate_pinky_state(maze, state)
 ```
 
 ### pack_heuristic_components
@@ -320,7 +321,7 @@ evaluate_pinky_state(graph, state)
 Devuelve las partes de la evaluacion colaborativa.
 
 ```python
-pack_heuristic_components(graph, state)
+pack_heuristic_components(maze, state)
 ```
 
 ### evaluate_pack_state
@@ -328,7 +329,7 @@ pack_heuristic_components(graph, state)
 Devuelve el score final para Inky/Clyde.
 
 ```python
-evaluate_pack_state(graph, state)
+evaluate_pack_state(maze, state)
 ```
 
 ## Lo Que Sigue
